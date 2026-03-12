@@ -12,6 +12,10 @@ import { SearchBar } from "./search-bar";
 
 export type KeyHandler = (e: KeyboardEvent) => boolean;
 
+function shellEscape(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 export class Tab {
   readonly id: string;
   title: string;
@@ -20,6 +24,7 @@ export class Tab {
   readonly searchAddon: SearchAddon;
   readonly element: HTMLDivElement;
   private pty: IPty | null = null;
+  ptyPid: number | null = null;
   private disposed = false;
   private config: Config;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -28,15 +33,17 @@ export class Tab {
   state: TabState = createDefaultTabState();
   readonly analyzer: OutputAnalyzer;
   private searchBar: SearchBar | null = null;
+  private cwd: string | undefined;
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
   onNeedsAttention: (() => void) | null = null;
   onOutputEvent: ((event: OutputEvent) => void) | null = null;
 
-  constructor(id: string, title: string, config: Config, keyHandler?: KeyHandler) {
+  constructor(id: string, title: string, config: Config, keyHandler?: KeyHandler, cwd?: string) {
     this.id = id;
     this.title = title;
     this.config = config;
+    this.cwd = cwd;
 
     this.analyzer = new OutputAnalyzer(
       config.outputAnalysis?.bufferSize ?? 4096,
@@ -194,18 +201,28 @@ export class Tab {
     const cols = this.terminal.cols;
     const rows = this.terminal.rows;
 
-    this.pty = spawn(this.config.shell, [], {
+    const spawnOpts: Record<string, unknown> = {
       cols,
       rows,
       name: "xterm-256color",
-    });
+    };
+    if (this.cwd) spawnOpts.cwd = this.cwd;
 
+    this.pty = spawn(this.config.shell, [], spawnOpts as any);
+    this.ptyPid = this.pty.pid;
+
+    let hasSentCd = false;
     this.pty.onData((data: Uint8Array | number[]) => {
       if (!this.disposed) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
         this.terminal.write(bytes);
         if (this.config.outputAnalysis?.enabled !== false) {
           this.analyzer.feed(bytes);
+        }
+        // cd after first output (shell prompt is ready)
+        if (!hasSentCd && this.cwd && this.pty) {
+          hasSentCd = true;
+          this.pty.write(`cd ${shellEscape(this.cwd)} && clear\r`);
         }
       }
     });

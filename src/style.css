@@ -20,18 +20,24 @@
   box-sizing: border-box;
 }
 
-html, body, #app {
+html, body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: #000000;
+  background: var(--sidebar-bg);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 #app {
+  height: 100%;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--sidebar-bg);
+  border-radius: 10px;
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
 }
 
 #app.sidebar-right #main-area {
@@ -43,19 +49,19 @@ html, body, #app {
   height: 38px;
   min-height: 38px;
   width: 100%;
-  -webkit-app-region: drag;
   background: var(--sidebar-bg);
   position: relative;
   z-index: 100;
   display: flex;
   align-items: center;
   padding-left: 12px;
+  border-radius: 10px 10px 0 0;
+  cursor: default;
 }
 
 #traffic-lights {
   display: flex;
   gap: 8px;
-  -webkit-app-region: no-drag;
 }
 
 .traffic-light {
@@ -103,11 +109,17 @@ html, body, #app {
   user-select: none;
   -webkit-user-select: none;
   -webkit-app-region: no-drag;
+  border-radius: 0 0 0 10px;
 }
 
 #app.sidebar-right #sidebar {
   border-right: none;
   border-left: 1px solid var(--sidebar-border);
+  border-radius: 0 0 10px 0;
+}
+
+#app.sidebar-right #status-bar {
+  border-radius: 0 0 0 10px;
 }
 
 #tab-list {
@@ -152,11 +164,18 @@ html, body, #app {
 }
 
 .tab-icon {
-  font-size: 12px;
-  opacity: 0.6;
   flex-shrink: 0;
   width: 14px;
-  text-align: center;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sidebar-tab-text);
+  opacity: 0.5;
+}
+
+.tab-icon svg {
+  display: block;
 }
 
 .tab-entry.active .tab-icon {
@@ -243,6 +262,18 @@ html, body, #app {
   color: var(--color-red);
 }
 
+/* Keyboard shortcut hint */
+.tab-shortcut {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.tab-entry.active .tab-shortcut {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .tab-title-input {
   flex: 1;
   background: rgba(255, 255, 255, 0.1);
@@ -254,19 +285,6 @@ html, body, #app {
   border-radius: 4px;
   outline: none;
   width: 100%;
-}
-
-/* Globe icon for server tabs */
-.tab-globe {
-  font-size: 11px;
-  cursor: pointer;
-  opacity: 0.5;
-  transition: opacity 0.12s;
-  flex-shrink: 0;
-}
-
-.tab-globe:hover {
-  opacity: 1;
 }
 
 .tab-close {
@@ -400,6 +418,7 @@ html, body, #app {
   gap: 16px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.35);
+  border-radius: 0 0 10px 0;
 }
 
 #status-bar span:empty {

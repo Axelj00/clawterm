@@ -1,6 +1,7 @@
 import { Tab } from "./tab";
 import { loadConfig, matchesKeybinding, applyThemeToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { ACTIVITY_ICONS, computeSubtitle } from "./tab-state";
 import { NotificationManager } from "./notifications";
 import { ServerTracker } from "./server-tracker";
@@ -52,7 +53,7 @@ export class TerminalManager {
       app.classList.add("sidebar-right");
     }
     app.innerHTML = `
-      <div id="titlebar" data-tauri-drag-region>
+      <div id="titlebar">
         <div id="traffic-lights">
           <button class="traffic-light close" id="btn-close"></button>
           <button class="traffic-light minimize" id="btn-minimize"></button>
@@ -82,6 +83,18 @@ export class TerminalManager {
     document.getElementById("btn-close")!.addEventListener("click", () => win.close());
     document.getElementById("btn-minimize")!.addEventListener("click", () => win.minimize());
     document.getElementById("btn-maximize")!.addEventListener("click", () => win.toggleMaximize());
+
+    // Explicit drag handling for custom titlebar
+    const titlebar = document.getElementById("titlebar")!;
+    titlebar.addEventListener("mousedown", (e) => {
+      // Only drag from the titlebar itself, not buttons
+      if ((e.target as HTMLElement).closest("#traffic-lights")) return;
+      win.startDragging();
+    });
+    titlebar.addEventListener("dblclick", (e) => {
+      if ((e.target as HTMLElement).closest("#traffic-lights")) return;
+      win.toggleMaximize();
+    });
 
     document.getElementById("new-tab-btn")!.addEventListener("click", () => {
       this.createTab();
@@ -164,7 +177,22 @@ export class TerminalManager {
     this.tabCounter++;
     const id = `tab-${this.tabCounter}`;
     const title = `Terminal ${this.tabCounter}`;
-    const tab = new Tab(id, title, this.config, this.handleKey);
+
+    // Grab CWD from active tab synchronously before anything else
+    let cwd: string | undefined;
+    if (this.activeTabId) {
+      const activeTab = this.tabs.get(this.activeTabId);
+      if (activeTab?.ptyPid) {
+        try {
+          const fg = await invoke<{ name: string; pid: number }>("get_foreground_process", { pid: activeTab.ptyPid });
+          cwd = await invoke<string>("get_process_cwd_full", { pid: fg.pid });
+        } catch {
+          // Fall back to default home dir
+        }
+      }
+    }
+
+    const tab = new Tab(id, title, this.config, this.handleKey, cwd);
 
     tab.onExit = () => {
       this.serverTracker.removeServer(id);
@@ -187,9 +215,15 @@ export class TerminalManager {
 
     this.tabs.set(id, tab);
     this.renderTabList();
-    this.switchToTab(id);
+
+    // Start the PTY and open terminal in DOM first
     await tab.start();
-    tab.focus();
+
+    // Now switch to it (show + focus) after terminal is ready
+    this.switchToTab(id);
+
+    // Extra focus after a frame to ensure terminal is interactive
+    requestAnimationFrame(() => tab.focus());
   }
 
   private handleTabOutputEvent(tabId: string, tab: Tab, event: OutputEvent) {
@@ -389,6 +423,7 @@ export class TerminalManager {
     const list = document.getElementById("tab-list")!;
     list.innerHTML = "";
 
+    let index = 0;
     for (const [id, tab] of this.tabs) {
       const entry = document.createElement("div");
       let cls = "tab-entry";
@@ -403,7 +438,7 @@ export class TerminalManager {
       const activityInfo = ACTIVITY_ICONS[tab.state.activity];
       const icon = document.createElement("span");
       icon.className = `tab-icon ${activityInfo.cssClass}`;
-      icon.textContent = activityInfo.icon;
+      icon.innerHTML = activityInfo.svg;
 
       const titleWrap = document.createElement("div");
       titleWrap.className = "tab-title-wrap";
@@ -422,17 +457,17 @@ export class TerminalManager {
         titleWrap.appendChild(sub);
       }
 
-      // Server globe icon
-      if (tab.state.serverPort) {
-        const globe = document.createElement("span");
-        globe.className = "tab-globe";
-        globe.textContent = "\uD83C\uDF10";
-        globe.title = `localhost:${tab.state.serverPort}`;
-        globe.addEventListener("click", (e) => {
-          e.stopPropagation();
-          window.open(`http://localhost:${tab.state.serverPort}`, "_blank");
-        });
-        entry.appendChild(globe);
+      // Shortcut hint (⌘1–⌘9)
+      if (index < 9) {
+        const hint = document.createElement("span");
+        hint.className = "tab-shortcut";
+        hint.textContent = `\u2318${index + 1}`;
+        entry.appendChild(icon);
+        entry.appendChild(titleWrap);
+        entry.appendChild(hint);
+      } else {
+        entry.appendChild(icon);
+        entry.appendChild(titleWrap);
       }
 
       const close = document.createElement("button");
@@ -443,8 +478,6 @@ export class TerminalManager {
         this.closeTab(id);
       });
 
-      entry.appendChild(icon);
-      entry.appendChild(titleWrap);
       entry.appendChild(close);
       entry.addEventListener("click", () => this.switchToTab(id));
       entry.addEventListener("dblclick", (e) => {
@@ -455,6 +488,7 @@ export class TerminalManager {
         this.showTabContextMenu(e, id);
       });
       list.appendChild(entry);
+      index++;
     }
   }
 
