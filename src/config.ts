@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { NotificationsConfig } from "./notifications";
 import { logger } from "./logger";
 import { modKey, isMac } from "./utils";
+import { showToast } from "./toast";
 
 export interface TerminalTheme {
   background: string;
@@ -246,6 +247,7 @@ export async function loadConfig(): Promise<Config> {
     return validateConfig(deepMerge(DEFAULT_CONFIG, userConfig));
   } catch (e) {
     logger.warn("Failed to load config, using defaults:", e);
+    showToast("Config file is invalid — using defaults", "warn");
     return { ...DEFAULT_CONFIG };
   }
 }

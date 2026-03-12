@@ -11,6 +11,7 @@ import { type OutputEvent, AGENT_PROCESS_MAP } from "./matchers";
 import { SearchBar } from "./search-bar";
 import { logger } from "./logger";
 import { isMac } from "./utils";
+import { showToast } from "./toast";
 
 export type KeyHandler = (e: KeyboardEvent) => boolean;
 
@@ -35,6 +36,7 @@ export class Tab {
   readonly analyzer: OutputAnalyzer;
   private searchBar: SearchBar | null = null;
   private cwd: string | undefined;
+  private pollFailures = 0;
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
   onNeedsAttention: (() => void) | null = null;
@@ -208,7 +210,13 @@ export class Tab {
     };
     if (this.cwd) spawnOpts.cwd = this.cwd;
 
-    this.pty = spawn(this.config.shell, [], spawnOpts as any);
+    try {
+      this.pty = spawn(this.config.shell, [], spawnOpts as any);
+    } catch (e) {
+      showToast(`Failed to start shell: ${this.config.shell}`, "error", 8000);
+      logger.warn("PTY spawn failed:", e);
+      return;
+    }
     this.ptyPid = this.pty.pid;
 
     let hasSentCd = false;
@@ -313,8 +321,13 @@ export class Tab {
       }
 
       this.updateTitle();
+      this.pollFailures = 0;
     } catch (e) {
+      this.pollFailures++;
       logger.debug("Poll failed (process may have exited):", e);
+      if (this.pollFailures === 5) {
+        showToast("Process info unavailable — some tab features may not work", "warn");
+      }
     }
   }
 
