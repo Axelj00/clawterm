@@ -36,6 +36,7 @@ export class Tab {
   readonly analyzer: OutputAnalyzer;
   private searchBar: SearchBar | null = null;
   private cwd: string | undefined;
+  private lastFullCwd: string | null = null;
   private pollFailures = 0;
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
@@ -308,13 +309,12 @@ export class Tab {
         this.state.lastError = null;
       }
 
-      // Fetch project name if we have a CWD
-      if (fullCwd && !this.state.projectName) {
+      // Re-fetch project name when CWD changes
+      if (fullCwd && fullCwd !== this.lastFullCwd) {
+        this.lastFullCwd = fullCwd;
         try {
           const projectName = await invokeWithTimeout<string>("get_project_info", { dir: fullCwd }, timeout);
-          if (projectName && projectName !== folder) {
-            this.state.projectName = projectName;
-          }
+          this.state.projectName = projectName && projectName !== folder ? projectName : null;
         } catch (e) {
           logger.debug("Failed to get project info:", e);
         }
