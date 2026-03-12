@@ -1,6 +1,7 @@
 import { Tab } from "./tab";
 import { loadConfig, matchesKeybinding, applyThemeToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout } from "./utils";
 import { ACTIVITY_ICONS, computeSubtitle } from "./tab-state";
 import { NotificationManager } from "./notifications";
@@ -113,6 +114,7 @@ export class TerminalManager {
           el("div", { id: "tab-list", role: "tablist", "aria-label": "Terminal tabs" }),
           el("div", { id: "sidebar-footer" }, el("button", { id: "new-tab-btn" }, "+ New Tab")),
         ),
+        el("div", { id: "sidebar-divider" }),
         el(
           "div",
           { id: "terminal-area" },
@@ -148,6 +150,48 @@ export class TerminalManager {
 
     document.getElementById("new-tab-btn")!.addEventListener("click", () => {
       this.createTab();
+    });
+
+    this.setupSidebarResize();
+  }
+
+  private setupSidebarResize() {
+    const divider = document.getElementById("sidebar-divider")!;
+    const isRight = this.config.sidebar.position === "right";
+    let dragging = false;
+
+    divider.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      dragging = true;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const width = isRight ? window.innerWidth - e.clientX : e.clientX;
+      const clamped = Math.min(600, Math.max(100, width));
+      document.documentElement.style.setProperty("--sidebar-width", `${clamped}px`);
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+
+      // Persist to config
+      const width = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-width"));
+      if (width && width !== this.config.sidebar.width) {
+        this.config.sidebar.width = width;
+        invoke("write_config", { contents: JSON.stringify(this.config, null, 2) }).catch(() => {});
+      }
+
+      // Refit active terminal
+      if (this.activeTabId) {
+        const tab = this.tabs.get(this.activeTabId);
+        tab?.fit();
+      }
     });
   }
 

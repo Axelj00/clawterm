@@ -385,6 +385,21 @@ body {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
+/* Sidebar resize divider */
+#sidebar-divider {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+#sidebar-divider:hover,
+#sidebar-divider:active {
+  background: var(--sidebar-accent);
+}
+
 /* Terminal area (container + status bar) */
 #terminal-area {
   flex: 1;
