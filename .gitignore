@@ -20,6 +20,9 @@ src-tauri/gen/schemas/
 *.swo
 *~
 
+# Signing keys (private key - NEVER commit this)
+.tauri/update-key.pem
+
 # Environment variables
 .env
 .env.*
