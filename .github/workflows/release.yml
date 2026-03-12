@@ -9,7 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  # Run checks once, not 3 times
   check:
     runs-on: ubuntu-latest
     steps:
@@ -53,6 +52,9 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -71,6 +73,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: sccache
           # Uncomment when you have an Apple Developer account:
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
