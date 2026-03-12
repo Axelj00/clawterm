@@ -35,7 +35,7 @@ Clawterm is not yet distributed as a pre-built binary. To run it, build from sou
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/clawterm.git
+git clone https://github.com/Axelj00/clawterm.git
 cd clawterm
 
 # Install frontend dependencies
