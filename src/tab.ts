@@ -116,6 +116,7 @@ export class Tab {
     this.pty = spawn(this.config.shell, [], {
       cols,
       rows,
+      name: "xterm-256color",
     });
 
     this.pty.onData((data: Uint8Array | number[]) => {
