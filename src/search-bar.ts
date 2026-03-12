@@ -1,0 +1,115 @@
+import type { SearchAddon } from "@xterm/addon-search";
+
+export class SearchBar {
+  private element: HTMLDivElement;
+  private input: HTMLInputElement;
+  private countLabel: HTMLSpanElement;
+  private searchAddon: SearchAddon;
+  private visible = false;
+
+  constructor(container: HTMLElement, searchAddon: SearchAddon) {
+    this.searchAddon = searchAddon;
+
+    this.element = document.createElement("div");
+    this.element.className = "search-bar";
+    this.element.style.display = "none";
+
+    this.input = document.createElement("input");
+    this.input.className = "search-input";
+    this.input.type = "text";
+    this.input.placeholder = "Search...";
+
+    this.countLabel = document.createElement("span");
+    this.countLabel.className = "search-count";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.className = "search-btn";
+    prevBtn.textContent = "\u25B2";
+    prevBtn.title = "Previous (Shift+Enter)";
+    prevBtn.addEventListener("click", () => this.findPrev());
+
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "search-btn";
+    nextBtn.textContent = "\u25BC";
+    nextBtn.title = "Next (Enter)";
+    nextBtn.addEventListener("click", () => this.findNext());
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "search-btn search-close";
+    closeBtn.textContent = "\u00D7";
+    closeBtn.addEventListener("click", () => this.hide());
+
+    this.element.appendChild(this.input);
+    this.element.appendChild(this.countLabel);
+    this.element.appendChild(prevBtn);
+    this.element.appendChild(nextBtn);
+    this.element.appendChild(closeBtn);
+    container.appendChild(this.element);
+
+    this.input.addEventListener("input", () => {
+      const term = this.input.value;
+      if (term) {
+        this.searchAddon.findNext(term, { incremental: true });
+      } else {
+        this.searchAddon.clearDecorations();
+        this.countLabel.textContent = "";
+      }
+    });
+
+    this.input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.findPrev();
+        } else {
+          this.findNext();
+        }
+      }
+      if (e.key === "Escape") {
+        this.hide();
+      }
+    });
+  }
+
+  toggle() {
+    if (this.visible) {
+      this.hide();
+    } else {
+      this.show();
+    }
+  }
+
+  show() {
+    this.visible = true;
+    this.element.style.display = "flex";
+    this.input.focus();
+    this.input.select();
+  }
+
+  hide() {
+    this.visible = false;
+    this.element.style.display = "none";
+    this.searchAddon.clearDecorations();
+    this.countLabel.textContent = "";
+  }
+
+  isVisible(): boolean {
+    return this.visible;
+  }
+
+  private findNext() {
+    if (this.input.value) {
+      this.searchAddon.findNext(this.input.value);
+    }
+  }
+
+  private findPrev() {
+    if (this.input.value) {
+      this.searchAddon.findPrevious(this.input.value);
+    }
+  }
+
+  dispose() {
+    this.element.remove();
+  }
+}

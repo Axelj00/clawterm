@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod process_info;
+mod server_check;
+
 use std::fs;
 use std::path::PathBuf;
 
@@ -36,7 +39,15 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_pty::init())
-        .invoke_handler(tauri::generate_handler![read_config, write_config])
+        .invoke_handler(tauri::generate_handler![
+            read_config,
+            write_config,
+            process_info::get_foreground_process,
+            process_info::get_process_cwd,
+            process_info::get_process_cwd_full,
+            process_info::get_project_info,
+            server_check::check_port,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

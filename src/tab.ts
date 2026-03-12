@@ -1,8 +1,14 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SearchAddon } from "@xterm/addon-search";
 import { spawn, type IPty } from "tauri-pty";
+import { invoke } from "@tauri-apps/api/core";
 import type { Config } from "./config";
+import { type TabState, createDefaultTabState, computeDisplayTitle } from "./tab-state";
+import { OutputAnalyzer } from "./output-analyzer";
+import { type OutputEvent, AGENT_PROCESS_MAP } from "./matchers";
+import { SearchBar } from "./search-bar";
 
 export type KeyHandler = (e: KeyboardEvent) => boolean;
 
@@ -11,16 +17,30 @@ export class Tab {
   title: string;
   readonly terminal: Terminal;
   readonly fitAddon: FitAddon;
+  readonly searchAddon: SearchAddon;
   readonly element: HTMLDivElement;
   private pty: IPty | null = null;
   private disposed = false;
   private config: Config;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private isVisible = false;
+  manualTitle: string | null = null;
+  state: TabState = createDefaultTabState();
+  readonly analyzer: OutputAnalyzer;
+  private searchBar: SearchBar | null = null;
   onExit: (() => void) | null = null;
+  onTitleChange: ((title: string) => void) | null = null;
+  onNeedsAttention: (() => void) | null = null;
+  onOutputEvent: ((event: OutputEvent) => void) | null = null;
 
   constructor(id: string, title: string, config: Config, keyHandler?: KeyHandler) {
     this.id = id;
     this.title = title;
     this.config = config;
+
+    this.analyzer = new OutputAnalyzer(
+      config.outputAnalysis?.bufferSize ?? 4096,
+    );
 
     this.terminal = new Terminal({
       cursorBlink: config.cursor.blink,
@@ -94,11 +114,72 @@ export class Tab {
     });
 
     this.fitAddon = new FitAddon();
+    this.searchAddon = new SearchAddon();
     this.terminal.loadAddon(this.fitAddon);
     this.terminal.loadAddon(new WebLinksAddon());
+    this.terminal.loadAddon(this.searchAddon);
 
     this.element = document.createElement("div");
     this.element.className = "terminal-wrapper";
+
+    // Wire output analyzer events
+    if (config.outputAnalysis?.enabled !== false) {
+      this.analyzer.onEvent((event) => {
+        this.handleOutputEvent(event);
+      });
+    }
+  }
+
+  private handleOutputEvent(event: OutputEvent) {
+    switch (event.type) {
+      case "agent-waiting":
+        this.state.activity = "agent-waiting";
+        if (event.agentName) this.state.agentName = event.agentName;
+        if (!this.isVisible) {
+          this.state.needsAttention = true;
+          this.onNeedsAttention?.();
+        }
+        break;
+      case "server-started":
+        this.state.activity = "server-running";
+        if (event.port) this.state.serverPort = event.port;
+        break;
+      case "server-crashed":
+        this.state.activity = "error";
+        this.state.lastError = "Server crashed";
+        break;
+      case "error":
+        this.state.activity = "error";
+        this.state.lastError = event.detail.slice(0, 50);
+        break;
+      case "agent-completed":
+        this.state.activity = "completed";
+        if (!this.isVisible) {
+          this.state.needsAttention = true;
+          this.onNeedsAttention?.();
+        }
+        // Fade completed back to idle after 5s
+        setTimeout(() => {
+          if (this.state.activity === "completed") {
+            this.state.activity = "idle";
+            this.updateTitle();
+          }
+        }, 5000);
+        break;
+    }
+
+    this.updateTitle();
+    this.onOutputEvent?.(event);
+  }
+
+  private updateTitle() {
+    if (!this.manualTitle) {
+      const displayTitle = computeDisplayTitle(this.state);
+      if (displayTitle !== this.title) {
+        this.title = displayTitle;
+        this.onTitleChange?.(displayTitle);
+      }
+    }
   }
 
   async start() {
@@ -123,6 +204,9 @@ export class Tab {
       if (!this.disposed) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
         this.terminal.write(bytes);
+        if (this.config.outputAnalysis?.enabled !== false) {
+          this.analyzer.feed(bytes);
+        }
       }
     });
 
@@ -143,6 +227,81 @@ export class Tab {
         this.pty.resize(cols, rows);
       }
     });
+
+    // Create search bar for this tab
+    this.searchBar = new SearchBar(this.element, this.searchAddon);
+
+    this.startPolling();
+  }
+
+  private startPolling() {
+    if (!this.pty) return;
+    const shellPid = this.pty.pid;
+
+    this.pollTimer = setInterval(async () => {
+      if (this.disposed || !this.pty) return;
+
+      try {
+        const [procInfo, folder, fullCwd] = await Promise.all([
+          invoke<{ name: string; pid: number }>("get_foreground_process", { pid: shellPid }),
+          invoke<string>("get_process_cwd", { pid: shellPid }),
+          invoke<string>("get_process_cwd_full", { pid: shellPid }),
+        ]);
+
+        const wasIdle = this.state.isIdle;
+        const newIsIdle = procInfo.pid === shellPid;
+
+        this.state.folderName = folder;
+        this.state.processName = newIsIdle ? "" : procInfo.name;
+        this.state.isIdle = newIsIdle;
+
+        // Detect agent from process name
+        if (!newIsIdle) {
+          const agentId = AGENT_PROCESS_MAP[procInfo.name.toLowerCase()];
+          if (agentId) {
+            this.state.agentName = agentId;
+            if (this.state.activity === "idle") {
+              this.state.activity = "running";
+            }
+          } else if (this.state.activity !== "server-running" && this.state.activity !== "error") {
+            this.state.activity = "running";
+          }
+        }
+
+        // Idle transition in background tab = needs attention
+        if (!wasIdle && newIsIdle && !this.isVisible) {
+          this.state.needsAttention = true;
+          if (this.onNeedsAttention) this.onNeedsAttention();
+        }
+
+        // Reset activity on idle (unless server is running)
+        if (newIsIdle && this.state.activity !== "server-running" && this.state.activity !== "completed") {
+          this.state.activity = "idle";
+          this.state.agentName = null;
+          this.state.lastError = null;
+        }
+
+        // Fetch project name if we have a CWD
+        if (fullCwd && !this.state.projectName) {
+          try {
+            const projectName = await invoke<string>("get_project_info", { dir: fullCwd });
+            if (projectName && projectName !== folder) {
+              this.state.projectName = projectName;
+            }
+          } catch {
+            // Ignore
+          }
+        }
+
+        this.updateTitle();
+      } catch {
+        // Process may have exited, ignore
+      }
+    }, 2000);
+  }
+
+  toggleSearch() {
+    this.searchBar?.toggle();
   }
 
   applyConfig(config: Config) {
@@ -157,6 +316,8 @@ export class Tab {
   }
 
   show() {
+    this.isVisible = true;
+    this.state.needsAttention = false;
     this.element.classList.add("active");
     requestAnimationFrame(() => {
       this.fitAddon.fit();
@@ -165,6 +326,7 @@ export class Tab {
   }
 
   hide() {
+    this.isVisible = false;
     this.element.classList.remove("active");
   }
 
@@ -180,9 +342,15 @@ export class Tab {
 
   dispose() {
     this.disposed = true;
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
     if (this.pty) {
       this.pty.kill();
     }
+    this.analyzer.dispose();
+    this.searchBar?.dispose();
     this.terminal.dispose();
     this.element.remove();
   }

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { NotificationsConfig } from "./notifications";
 
 export interface TerminalTheme {
   background: string;
@@ -58,8 +59,16 @@ export interface Config {
     nextTab: string;
     prevTab: string;
     reloadConfig: string;
+    cycleAttention: string;
+    search: string;
+    quickSwitch: string;
     [key: string]: string;
   };
+  outputAnalysis: {
+    enabled: boolean;
+    bufferSize: number;
+  };
+  notifications: NotificationsConfig;
 }
 
 const DEFAULT_CONFIG: Config = {
@@ -118,6 +127,24 @@ const DEFAULT_CONFIG: Config = {
     nextTab: "cmd+shift+]",
     prevTab: "cmd+shift+[",
     reloadConfig: "cmd+shift+r",
+    cycleAttention: "cmd+shift+a",
+    search: "cmd+f",
+    quickSwitch: "cmd+p",
+  },
+  outputAnalysis: {
+    enabled: true,
+    bufferSize: 4096,
+  },
+  notifications: {
+    enabled: true,
+    sound: true,
+    types: {
+      completion: { enabled: true, sound: false },
+      agentWaiting: { enabled: true, sound: true },
+      serverStarted: { enabled: true, sound: false },
+      serverCrashed: { enabled: true, sound: true },
+      error: { enabled: true, sound: false },
+    },
   },
 };
 

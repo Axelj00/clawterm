@@ -1,19 +1,49 @@
 import { Tab } from "./tab";
 import { loadConfig, matchesKeybinding, applyThemeToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ACTIVITY_ICONS, computeSubtitle } from "./tab-state";
+import { NotificationManager } from "./notifications";
+import { ServerTracker } from "./server-tracker";
+import { showContextMenu, type ContextMenuItem } from "./context-menu";
+import { TabSwitcher, type SwitcherTab } from "./tab-switcher";
+import type { OutputEvent } from "./matchers";
 
 export class TerminalManager {
   private tabs: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
   private tabCounter = 0;
   private config!: Config;
+  private notifications!: NotificationManager;
+  private serverTracker = new ServerTracker();
+  private tabSwitcher = new TabSwitcher();
 
   async init() {
     this.config = await loadConfig();
+    this.notifications = new NotificationManager(this.config.notifications);
     applyThemeToCSS(this.config);
     this.renderShell();
     this.setupResize();
+    this.setupServerTracker();
     await this.createTab();
+  }
+
+  private setupServerTracker() {
+    this.serverTracker.onServerCrash((tabId, port) => {
+      const tab = this.tabs.get(tabId);
+      if (!tab) return;
+      tab.state.activity = "error";
+      tab.state.lastError = `Server on :${port} crashed`;
+      this.renderTabList();
+      this.updateStatusBar();
+
+      const event: OutputEvent = {
+        type: "server-crashed",
+        detail: `Server on port ${port} stopped responding`,
+        timestamp: Date.now(),
+        port,
+      };
+      this.notifications.notify(event, tab.title, this.activeTabId === tabId);
+    });
   }
 
   private renderShell() {
@@ -36,7 +66,15 @@ export class TerminalManager {
             <button id="new-tab-btn">+ New Tab</button>
           </div>
         </div>
-        <div id="terminal-container"></div>
+        <div id="terminal-area">
+          <div id="terminal-container"></div>
+          <div id="status-bar">
+            <span id="status-cwd"></span>
+            <span id="status-process"></span>
+            <span id="status-server"></span>
+            <span id="status-agent"></span>
+          </div>
+        </div>
       </div>
     `;
 
@@ -87,6 +125,27 @@ export class TerminalManager {
       return false;
     }
 
+    if (matchesKeybinding(e, kb.cycleAttention)) {
+      e.preventDefault();
+      this.cycleAttentionTabs();
+      return false;
+    }
+
+    if (matchesKeybinding(e, kb.search)) {
+      e.preventDefault();
+      if (this.activeTabId) {
+        const tab = this.tabs.get(this.activeTabId);
+        tab?.toggleSearch();
+      }
+      return false;
+    }
+
+    if (matchesKeybinding(e, kb.quickSwitch)) {
+      e.preventDefault();
+      this.showQuickSwitch();
+      return false;
+    }
+
     // Cmd+1-9: switch to tab by index
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "9") {
       e.preventDefault();
@@ -108,7 +167,22 @@ export class TerminalManager {
     const tab = new Tab(id, title, this.config, this.handleKey);
 
     tab.onExit = () => {
+      this.serverTracker.removeServer(id);
       this.closeTab(id);
+    };
+
+    tab.onTitleChange = () => {
+      this.renderTabList();
+      this.updateStatusBar();
+    };
+
+    tab.onNeedsAttention = () => {
+      this.renderTabList();
+      this.notifications.notifyCommandComplete(tab.title, this.activeTabId === tab.id);
+    };
+
+    tab.onOutputEvent = (event: OutputEvent) => {
+      this.handleTabOutputEvent(id, tab, event);
     };
 
     this.tabs.set(id, tab);
@@ -116,6 +190,20 @@ export class TerminalManager {
     this.switchToTab(id);
     await tab.start();
     tab.focus();
+  }
+
+  private handleTabOutputEvent(tabId: string, tab: Tab, event: OutputEvent) {
+    // Track servers
+    if (event.type === "server-started" && event.port) {
+      this.serverTracker.addServer(tabId, event.port);
+    }
+
+    // Forward to notifications
+    this.notifications.notify(event, tab.title, this.activeTabId === tabId);
+
+    // Re-render UI
+    this.renderTabList();
+    this.updateStatusBar();
   }
 
   private switchToTab(id: string) {
@@ -131,6 +219,7 @@ export class TerminalManager {
     if (tab) tab.show();
 
     this.renderTabList();
+    this.updateStatusBar();
   }
 
   private nextTab() {
@@ -149,10 +238,38 @@ export class TerminalManager {
     this.switchToTab(ids[prevIndex]);
   }
 
+  private cycleAttentionTabs() {
+    const attentionIds = Array.from(this.tabs.entries())
+      .filter(([, tab]) => tab.state.needsAttention)
+      .map(([id]) => id);
+
+    if (attentionIds.length === 0) return;
+
+    const currentIndex = attentionIds.indexOf(this.activeTabId!);
+    const nextIndex = (currentIndex + 1) % attentionIds.length;
+    this.switchToTab(attentionIds[nextIndex]);
+  }
+
+  private showQuickSwitch() {
+    const switcherTabs: SwitcherTab[] = Array.from(this.tabs.entries()).map(([id, tab]) => ({
+      id,
+      title: tab.title,
+      subtitle: computeSubtitle(tab.state),
+      activity: tab.state.activity,
+    }));
+
+    this.tabSwitcher.show(switcherTabs, (id) => {
+      this.switchToTab(id);
+      const tab = this.tabs.get(id);
+      tab?.focus();
+    });
+  }
+
   private closeTab(id: string) {
     const tab = this.tabs.get(id);
     if (!tab) return;
 
+    this.serverTracker.removeServer(id);
     tab.dispose();
     this.tabs.delete(id);
 
@@ -168,6 +285,7 @@ export class TerminalManager {
     }
 
     this.renderTabList();
+    this.updateStatusBar();
   }
 
   private startRenameTab(id: string) {
@@ -187,6 +305,7 @@ export class TerminalManager {
     const commit = () => {
       const newTitle = input.value.trim() || tab.title;
       tab.title = newTitle;
+      tab.manualTitle = newTitle;
       this.renderTabList();
     };
 
@@ -206,22 +325,115 @@ export class TerminalManager {
     input.select();
   }
 
+  private showTabContextMenu(e: MouseEvent, tabId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    const items: ContextMenuItem[] = [
+      {
+        label: "Rename",
+        action: () => this.startRenameTab(tabId),
+      },
+      {
+        label: "Close",
+        action: () => this.closeTab(tabId),
+      },
+      {
+        label: "Close Others",
+        separator: true,
+        action: () => {
+          const ids = Array.from(this.tabs.keys()).filter((id) => id !== tabId);
+          for (const id of ids) this.closeTab(id);
+        },
+      },
+      {
+        label: "Close to Right",
+        action: () => {
+          const ids = Array.from(this.tabs.keys());
+          const idx = ids.indexOf(tabId);
+          for (let i = ids.length - 1; i > idx; i--) {
+            this.closeTab(ids[i]);
+          }
+        },
+      },
+    ];
+
+    // Open in browser if server tab
+    const server = this.serverTracker.getServer(tabId);
+    if (server) {
+      items.push({
+        label: `Open localhost:${server.port} in Browser`,
+        separator: true,
+        action: () => {
+          window.open(`http://localhost:${server.port}`, "_blank");
+        },
+      });
+    }
+
+    // Copy CWD
+    items.push({
+      label: "Copy Working Directory",
+      separator: !server,
+      action: () => {
+        navigator.clipboard.writeText(tab.state.folderName);
+      },
+    });
+
+    showContextMenu(e.clientX, e.clientY, items);
+  }
+
   private renderTabList() {
     const list = document.getElementById("tab-list")!;
     list.innerHTML = "";
 
     for (const [id, tab] of this.tabs) {
       const entry = document.createElement("div");
-      entry.className = `tab-entry${id === this.activeTabId ? " active" : ""}`;
+      let cls = "tab-entry";
+      if (id === this.activeTabId) cls += " active";
+      if (tab.state.needsAttention) cls += " needs-attention";
+      if (tab.state.activity === "agent-waiting") cls += " agent-waiting";
+      if (tab.state.activity === "error") cls += " has-error";
+      entry.className = cls;
       entry.setAttribute("data-id", id);
 
+      // Activity icon
+      const activityInfo = ACTIVITY_ICONS[tab.state.activity];
       const icon = document.createElement("span");
-      icon.className = "tab-icon";
-      icon.textContent = "\u25b8";
+      icon.className = `tab-icon ${activityInfo.cssClass}`;
+      icon.textContent = activityInfo.icon;
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "tab-title-wrap";
 
       const title = document.createElement("span");
       title.className = "tab-title";
       title.textContent = tab.title;
+      titleWrap.appendChild(title);
+
+      // Subtitle
+      const subtitle = computeSubtitle(tab.state);
+      if (subtitle) {
+        const sub = document.createElement("span");
+        sub.className = "tab-subtitle";
+        sub.textContent = subtitle;
+        titleWrap.appendChild(sub);
+      }
+
+      // Server globe icon
+      if (tab.state.serverPort) {
+        const globe = document.createElement("span");
+        globe.className = "tab-globe";
+        globe.textContent = "\uD83C\uDF10";
+        globe.title = `localhost:${tab.state.serverPort}`;
+        globe.addEventListener("click", (e) => {
+          e.stopPropagation();
+          window.open(`http://localhost:${tab.state.serverPort}`, "_blank");
+        });
+        entry.appendChild(globe);
+      }
 
       const close = document.createElement("button");
       close.className = "tab-close";
@@ -232,19 +444,58 @@ export class TerminalManager {
       });
 
       entry.appendChild(icon);
-      entry.appendChild(title);
+      entry.appendChild(titleWrap);
       entry.appendChild(close);
       entry.addEventListener("click", () => this.switchToTab(id));
       entry.addEventListener("dblclick", (e) => {
         e.preventDefault();
         this.startRenameTab(id);
       });
+      entry.addEventListener("contextmenu", (e) => {
+        this.showTabContextMenu(e, id);
+      });
       list.appendChild(entry);
+    }
+  }
+
+  private updateStatusBar() {
+    if (!this.activeTabId) return;
+    const tab = this.tabs.get(this.activeTabId);
+    if (!tab) return;
+
+    const cwdEl = document.getElementById("status-cwd");
+    const processEl = document.getElementById("status-process");
+    const serverEl = document.getElementById("status-server");
+    const agentEl = document.getElementById("status-agent");
+
+    if (cwdEl) cwdEl.textContent = tab.state.folderName;
+    if (processEl) {
+      processEl.textContent = tab.state.isIdle ? "" : tab.state.processName;
+    }
+    if (serverEl) {
+      serverEl.textContent = tab.state.serverPort ? `:${tab.state.serverPort}` : "";
+      serverEl.className = tab.state.serverPort ? "status-active" : "";
+    }
+    if (agentEl) {
+      if (tab.state.activity === "agent-waiting") {
+        agentEl.textContent = `${tab.state.agentName ?? "agent"} — waiting`;
+        agentEl.className = "status-waiting";
+      } else if (tab.state.agentName) {
+        agentEl.textContent = tab.state.agentName;
+        agentEl.className = "status-active";
+      } else if (tab.state.lastError) {
+        agentEl.textContent = tab.state.lastError;
+        agentEl.className = "status-error";
+      } else {
+        agentEl.textContent = "";
+        agentEl.className = "";
+      }
     }
   }
 
   private async reloadConfig() {
     this.config = await loadConfig();
+    this.notifications.updateConfig(this.config.notifications);
     applyThemeToCSS(this.config);
 
     for (const tab of this.tabs.values()) {
