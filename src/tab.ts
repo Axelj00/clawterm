@@ -43,8 +43,8 @@ export class Tab {
   private focusedPane: Pane;
   /** All panes in this tab (flat list for easy iteration) */
   private panes: Pane[] = [];
-  /** Cleanup functions for document-level drag listeners */
-  private dividerCleanups: (() => void)[] = [];
+  /** Cleanup functions for document-level drag listeners, keyed by branch */
+  private dividerCleanups = new Map<SplitBranch, () => void>();
 
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
@@ -268,8 +268,13 @@ export class Tab {
       nextFocus.focus();
     }
 
-    // Clean up the split container element
+    // Clean up the split container element and its document-level drag listeners
     parent.element.remove();
+    const cleanup = this.dividerCleanups.get(parent);
+    if (cleanup) {
+      cleanup();
+      this.dividerCleanups.delete(parent);
+    }
 
     requestAnimationFrame(() => this.fitAllPanes());
   }
@@ -445,8 +450,8 @@ export class Tab {
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
 
-    // Track for cleanup on dispose
-    this.dividerCleanups.push(() => {
+    // Track for cleanup — keyed by branch so we can remove on pane close
+    this.dividerCleanups.set(branch, () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     });
@@ -573,10 +578,10 @@ export class Tab {
 
   dispose() {
     // Clean up document-level divider drag listeners
-    for (const cleanup of this.dividerCleanups) {
+    for (const cleanup of this.dividerCleanups.values()) {
       cleanup();
     }
-    this.dividerCleanups = [];
+    this.dividerCleanups.clear();
 
     for (const pane of this.panes) {
       pane.dispose();
