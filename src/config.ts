@@ -286,7 +286,21 @@ export async function loadConfig(): Promise<Config> {
     }
 
     const userConfig = JSON.parse(text);
-    return validateConfig(deepMerge(DEFAULT_CONFIG, userConfig));
+    const validated = validateConfig(deepMerge(DEFAULT_CONFIG, userConfig));
+
+    // Check shell path exists and is executable on disk
+    try {
+      const shellOk = await invoke<boolean>("validate_shell", { path: validated.shell });
+      if (!shellOk) {
+        logger.warn(`Config: shell "${validated.shell}" not found or not executable. Using default.`);
+        showToast(`Shell "${validated.shell}" not found — using ${DEFAULT_CONFIG.shell}`, "warn");
+        validated.shell = DEFAULT_CONFIG.shell;
+      }
+    } catch (e) {
+      logger.warn("Shell validation failed:", e);
+    }
+
+    return validated;
   } catch (e) {
     logger.warn("Failed to load config, using defaults:", e);
     showToast("Config file is invalid — using defaults", "warn");

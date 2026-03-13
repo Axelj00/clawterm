@@ -59,6 +59,18 @@ fn write_session(contents: String) -> Result<(), String> {
     fs::write(&path, contents).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn validate_shell(path: String) -> Result<bool, String> {
+    use std::os::unix::fs::PermissionsExt;
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Ok(false);
+    }
+    let meta = fs::metadata(p).map_err(|e| e.to_string())?;
+    // Check it's a file and executable (any execute bit set)
+    Ok(meta.is_file() && (meta.permissions().mode() & 0o111 != 0))
+}
+
 fn main() {
     // Clean env vars that prevent tools from running inside our PTYs
     std::env::remove_var("CLAUDECODE");
@@ -77,6 +89,7 @@ fn main() {
             process_info::get_process_cwd_full,
             process_info::get_project_info,
             server_check::check_port,
+            validate_shell,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
