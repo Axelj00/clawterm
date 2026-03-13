@@ -605,7 +605,8 @@ body {
   flex-shrink: 0;
   background: var(--sidebar-border);
   transition: background 0.15s;
-  z-index: 1;
+  z-index: 10;
+  position: relative;
 }
 
 .split-divider:hover {
@@ -615,11 +616,18 @@ body {
 .split-divider-horizontal {
   width: 6px;
   cursor: col-resize;
+  /* Expand click target beyond visual width */
+  margin: 0 -3px;
+  padding: 0 3px;
+  background-clip: content-box;
 }
 
 .split-divider-vertical {
   height: 6px;
   cursor: row-resize;
+  margin: -3px 0;
+  padding: 3px 0;
+  background-clip: content-box;
 }
 
 /* Status bar */

@@ -437,6 +437,11 @@ export class Tab {
       dragging = true;
       document.body.style.cursor = branch.direction === "horizontal" ? "col-resize" : "row-resize";
       document.body.style.userSelect = "none";
+      // Disable pointer events on all panes during drag so the xterm canvas
+      // doesn't intercept mousemove events or start text selection
+      for (const pane of this.panes) {
+        pane.element.style.pointerEvents = "none";
+      }
     });
 
     const onMove = (e: MouseEvent) => {
@@ -458,6 +463,10 @@ export class Tab {
       dragging = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      // Restore pointer events on all panes
+      for (const pane of this.panes) {
+        pane.element.style.pointerEvents = "";
+      }
       this.fitAllPanes();
     };
 
