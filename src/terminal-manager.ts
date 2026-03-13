@@ -769,14 +769,34 @@ export class TerminalManager {
       });
     }
 
+    // Process control
+    items.push({
+      label: "Kill Process",
+      separator: true,
+      disabled: tab.state.isIdle,
+      action: () => {
+        tab.sendInterrupt();
+      },
+    });
+
+    items.push({
+      label: "Restart Shell",
+      action: () => {
+        tab.restartShell();
+      },
+    });
+
     // Copy CWD
     items.push({
       label: "Copy Working Directory",
-      separator: !server,
+      separator: true,
       action: () => {
-        navigator.clipboard.writeText(tab.state.folderName).catch(() => {
-          showToast("Failed to copy to clipboard", "error");
-        });
+        const fullCwd = tab.lastFullCwd;
+        if (fullCwd) {
+          navigator.clipboard.writeText(fullCwd).catch(() => {
+            showToast("Failed to copy to clipboard", "error");
+          });
+        }
       },
     });
 

@@ -571,6 +571,74 @@ export class Tab {
     this.focusedPane.writeToPty(data);
   }
 
+  /** Send Ctrl-C to the focused pane's process. */
+  sendInterrupt() {
+    this.focusedPane.sendInterrupt();
+  }
+
+  /** Kill the focused pane's PTY and restart a fresh shell in the same CWD. */
+  async restartShell() {
+    const pane = this.focusedPane;
+    const cwd = pane.lastFullCwd ?? this.cwd;
+
+    // Dispose old pane
+    const idx = this.panes.indexOf(pane);
+    pane.dispose();
+
+    // Create replacement pane in the same CWD
+    const newPane = this.createPane(cwd);
+
+    // Replace in the tree
+    if (this.root.type === "leaf" && this.root.pane === pane) {
+      this.root = { type: "leaf", pane: newPane };
+      this.element.appendChild(newPane.element);
+    } else {
+      this.replaceLeafPane(this.root, pane, newPane);
+    }
+
+    // Remove old pane from list (createPane already added newPane)
+    this.panes = this.panes.filter((p) => p !== pane);
+
+    await newPane.start();
+    this.focusedPane = newPane;
+    for (const p of this.panes) {
+      p.element.classList.toggle("pane-focused", p === newPane);
+    }
+    newPane.focus();
+
+    // Reset tab state
+    this.state.activity = "idle";
+    this.state.agentName = null;
+    this.state.lastError = null;
+    this.state.processName = "";
+    this.state.isIdle = true;
+    this.pollFailures = 0;
+    this.pollStopped = false;
+    this.updateTitle();
+
+    // Hack: the old pane was already at `idx` in the list; newPane got appended.
+    // Reorder so newPane is at the same position.
+    if (idx >= 0 && idx < this.panes.length - 1) {
+      this.panes.splice(this.panes.indexOf(newPane), 1);
+      this.panes.splice(idx, 0, newPane);
+    }
+  }
+
+  /** Replace a leaf pane reference in the split tree. */
+  private replaceLeafPane(node: SplitNode, oldPane: Pane, newPane: Pane): boolean {
+    if (node.type !== "split") return false;
+    for (let i = 0; i < 2; i++) {
+      const child = node.children[i];
+      if (child.type === "leaf" && child.pane === oldPane) {
+        node.children[i] = { type: "leaf", pane: newPane };
+        node.element.replaceChild(newPane.element, oldPane.element);
+        return true;
+      }
+      if (this.replaceLeafPane(child, oldPane, newPane)) return true;
+    }
+    return false;
+  }
+
   applyConfig(config: Config) {
     this.config = config;
     for (const pane of this.panes) {

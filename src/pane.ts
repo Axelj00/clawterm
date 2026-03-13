@@ -301,6 +301,14 @@ export class Pane {
     }
   }
 
+  /** Send SIGINT (Ctrl-C) to the PTY foreground process group. */
+  sendInterrupt() {
+    if (this.pty && !this.disposed) {
+      // \x03 is Ctrl-C / ETX — the PTY driver sends SIGINT to the fg group
+      this.pty.write("\x03");
+    }
+  }
+
   dispose() {
     this.disposed = true;
     // Capture and null PTY ref before kill to prevent double-dispose
