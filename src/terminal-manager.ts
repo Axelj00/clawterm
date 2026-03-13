@@ -862,6 +862,7 @@ export class TerminalManager {
       const newIconClass = `tab-icon ${activityInfo.cssClass}`;
       if (icon.className !== newIconClass) {
         icon.className = newIconClass;
+        icon.title = activityInfo.label;
         icon.replaceChildren();
         const svgClone = PARSED_ICONS[tab.state.activity]?.cloneNode(true);
         if (svgClone) icon.appendChild(svgClone);

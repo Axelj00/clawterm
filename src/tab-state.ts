@@ -50,13 +50,14 @@ export function computeSubtitle(state: TabState): string | null {
 const svg = (inner: string) =>
   `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 
-export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string }> = {
+export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string; label: string }> = {
   idle: {
     // Terminal prompt: >_
     svg: svg(
       `<path d="M2.5 3.5L5 6L2.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><line x1="6.5" y1="9" x2="9.5" y2="9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`,
     ),
     cssClass: "activity-idle",
+    label: "Idle",
   },
   running: {
     // Spinning/active dot with ring
@@ -64,6 +65,7 @@ export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string
       `<circle cx="6" cy="6" r="2" fill="currentColor"/><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1" opacity="0.4"/>`,
     ),
     cssClass: "activity-running",
+    label: "Running",
   },
   "agent-waiting": {
     // Pause icon (two bars)
@@ -71,6 +73,7 @@ export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string
       `<rect x="3" y="2.5" width="2" height="7" rx="0.5" fill="currentColor"/><rect x="7" y="2.5" width="2" height="7" rx="0.5" fill="currentColor"/>`,
     ),
     cssClass: "activity-agent-waiting",
+    label: "Agent waiting",
   },
   "server-running": {
     // Signal/broadcast icon
@@ -78,6 +81,7 @@ export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string
       `<circle cx="6" cy="6" r="2" fill="currentColor"/><path d="M3 3a4.24 4.24 0 0 0 0 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M9 3a4.24 4.24 0 0 1 0 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>`,
     ),
     cssClass: "activity-server",
+    label: "Server running",
   },
   error: {
     // Warning triangle
@@ -85,6 +89,7 @@ export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string
       `<path d="M6 2L11 10H1L6 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><line x1="6" y1="5.5" x2="6" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="9" r="0.5" fill="currentColor"/>`,
     ),
     cssClass: "activity-error",
+    label: "Error",
   },
   completed: {
     // Checkmark
@@ -92,5 +97,6 @@ export const ACTIVITY_ICONS: Record<TabActivity, { svg: string; cssClass: string
       `<path d="M2.5 6.5L5 9L9.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`,
     ),
     cssClass: "activity-completed",
+    label: "Completed",
   },
 };
