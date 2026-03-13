@@ -540,10 +540,14 @@ export class Tab {
       if (fullCwd && fullCwd !== this.focusedPane.lastFullCwd) {
         this.focusedPane.lastFullCwd = fullCwd;
         try {
-          const projectName = await invokeWithTimeout<string>("get_project_info", { dir: fullCwd }, timeout);
+          const [projectName, gitBranch] = await Promise.all([
+            invokeWithTimeout<string>("get_project_info", { dir: fullCwd }, timeout),
+            invokeWithTimeout<string>("get_git_branch", { dir: fullCwd }, timeout),
+          ]);
           this.state.projectName = projectName && projectName !== folder ? projectName : null;
+          this.state.gitBranch = gitBranch || null;
         } catch (e) {
-          logger.debug("Failed to get project info:", e);
+          logger.debug("Failed to get project/git info:", e);
         }
       }
 

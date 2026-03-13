@@ -10,6 +10,7 @@ export interface TabState {
   serverPort: number | null;
   projectName: string | null;
   lastError: string | null;
+  gitBranch: string | null;
 }
 
 export function createDefaultTabState(): TabState {
@@ -23,6 +24,7 @@ export function createDefaultTabState(): TabState {
     serverPort: null,
     projectName: null,
     lastError: null,
+    gitBranch: null,
   };
 }
 

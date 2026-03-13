@@ -641,6 +641,10 @@ body {
   display: none;
 }
 
+#status-git {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 #status-bar .status-active {
   color: var(--color-green);
 }

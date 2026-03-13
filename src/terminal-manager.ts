@@ -153,6 +153,7 @@ export class TerminalManager {
             "div",
             { id: "status-bar" },
             el("span", { id: "status-cwd" }),
+            el("span", { id: "status-git" }),
             el("span", { id: "status-process" }),
             el("span", { id: "status-server" }),
             el("span", { id: "status-agent" }),
@@ -988,11 +989,15 @@ export class TerminalManager {
     if (!tab) return;
 
     const cwdEl = document.getElementById("status-cwd");
+    const gitEl = document.getElementById("status-git");
     const processEl = document.getElementById("status-process");
     const serverEl = document.getElementById("status-server");
     const agentEl = document.getElementById("status-agent");
 
     if (cwdEl) cwdEl.textContent = tab.state.folderName;
+    if (gitEl) {
+      gitEl.textContent = tab.state.gitBranch ? `\u2387 ${tab.state.gitBranch}` : "";
+    }
     if (processEl) {
       processEl.textContent = tab.state.isIdle ? "" : tab.state.processName;
     }
@@ -1065,7 +1070,7 @@ export class TerminalManager {
     for (const [id, tab] of this.tabs) {
       const s = tab.state;
       parts.push(
-        `${id}|${tab.title}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}`,
+        `${id}|${tab.title}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}|${s.gitBranch}`,
       );
     }
     parts.push(`active:${this.activeTabId}`);

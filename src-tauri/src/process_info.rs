@@ -117,6 +117,40 @@ pub fn get_project_info(dir: String) -> String {
         .unwrap_or_default()
 }
 
+/// Read the current git branch for a directory by parsing .git/HEAD.
+/// Walks up the directory tree to find the nearest .git directory.
+#[tauri::command]
+pub fn get_git_branch(dir: String) -> String {
+    let mut path = match std::fs::canonicalize(&dir) {
+        Ok(p) => p,
+        Err(_) => return String::new(),
+    };
+
+    // Walk up to find .git
+    loop {
+        let git_head = path.join(".git").join("HEAD");
+        if git_head.exists() {
+            if let Ok(content) = std::fs::read_to_string(&git_head) {
+                let content = content.trim();
+                // Format: "ref: refs/heads/branch-name"
+                if let Some(branch) = content.strip_prefix("ref: refs/heads/") {
+                    return branch.to_string();
+                }
+                // Detached HEAD — return short hash
+                if content.len() >= 8 {
+                    return content[..8].to_string();
+                }
+            }
+            return String::new();
+        }
+        if !path.pop() {
+            break;
+        }
+    }
+
+    String::new()
+}
+
 // --- macOS process introspection ---
 
 mod platform {
