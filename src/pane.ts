@@ -129,7 +129,7 @@ export class Pane {
     }
   }
 
-  async start() {
+  async start(): Promise<boolean> {
     this.terminal.open(this.element);
 
     await new Promise((r) => requestAnimationFrame(r));
@@ -149,9 +149,12 @@ export class Pane {
     try {
       this.pty = spawn(this.config.shell, [], spawnOpts as any);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       showToast(`Failed to start shell: ${this.config.shell}`, "error", 8000);
       logger.warn("PTY spawn failed:", e);
-      return;
+      this.terminal.writeln(`\r\n\x1b[31m  Failed to start shell: ${this.config.shell}\x1b[0m`);
+      this.terminal.writeln(`\x1b[31m  ${msg}\x1b[0m\r\n`);
+      return false;
     }
     this.ptyPid = this.pty.pid;
 
@@ -184,6 +187,7 @@ export class Pane {
     });
 
     this.searchBar = new SearchBar(this.element, this.searchAddon, () => this.terminal.focus());
+    return true;
   }
 
   /** Get process info for polling (used by Tab) */
