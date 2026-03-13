@@ -29,6 +29,13 @@ export interface TerminalTheme {
   brightWhite: string;
 }
 
+export interface UserMatcher {
+  id: string;
+  pattern: string;
+  type: "agent-waiting" | "server-started" | "server-crashed" | "error" | "agent-completed";
+  cooldownMs?: number;
+}
+
 export interface Config {
   shell: string;
   shellArgs: string[];
@@ -84,6 +91,8 @@ export interface Config {
   outputAnalysis: {
     enabled: boolean;
     bufferSize: number;
+    /** User-defined output matchers merged with defaults */
+    customMatchers: UserMatcher[];
   };
   notifications: NotificationsConfig;
   advanced: {
@@ -182,6 +191,7 @@ const DEFAULT_CONFIG: Config = {
   outputAnalysis: {
     enabled: true,
     bufferSize: 4096,
+    customMatchers: [],
   },
   notifications: {
     enabled: true,

@@ -7,7 +7,8 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { spawn, type IPty } from "tauri-pty";
 import type { Config } from "./config";
 import { OutputAnalyzer } from "./output-analyzer";
-import type { OutputEvent } from "./matchers";
+import type { OutputEvent, OutputMatcher } from "./matchers";
+import { DEFAULT_MATCHERS } from "./matchers";
 import { SearchBar } from "./search-bar";
 import { logger } from "./logger";
 import { showToast } from "./toast";
@@ -50,7 +51,22 @@ export class Pane {
     this.config = config;
     this.cwd = cwd;
 
-    this.analyzer = new OutputAnalyzer(config.outputAnalysis?.bufferSize ?? 4096);
+    // Build matchers: defaults + user-defined
+    const matchers: OutputMatcher[] = [...DEFAULT_MATCHERS];
+    for (const um of config.outputAnalysis?.customMatchers ?? []) {
+      try {
+        matchers.push({
+          id: um.id,
+          pattern: new RegExp(um.pattern, "i"),
+          type: um.type,
+          cooldownMs: um.cooldownMs ?? 5000,
+        });
+      } catch {
+        // Invalid regex — skip silently
+      }
+    }
+
+    this.analyzer = new OutputAnalyzer(config.outputAnalysis?.bufferSize ?? 4096, matchers);
 
     this.terminal = new Terminal({
       cursorBlink: config.cursor.blink,
