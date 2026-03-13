@@ -66,6 +66,7 @@ export class TerminalManager {
     this.renderShell();
     this.setupResize();
     this.setupServerTracker();
+    this.setupStatusBarClicks();
     this.startCentralPoll();
 
     // Restore session or create a fresh tab
@@ -1127,6 +1128,45 @@ export class TerminalManager {
 
     this.renderTabList();
     this.persistSession();
+  }
+
+  private setupStatusBarClicks() {
+    document.getElementById("status-cwd")?.addEventListener("click", () => {
+      if (!this.activeTabId) return;
+      const tab = this.tabs.get(this.activeTabId);
+      const cwd = tab?.lastFullCwd;
+      if (cwd) {
+        navigator.clipboard.writeText(cwd).then(
+          () => showToast(`Copied: ${cwd}`, "info", 2000),
+          () => {},
+        );
+      }
+    });
+
+    document.getElementById("status-git")?.addEventListener("click", () => {
+      if (!this.activeTabId) return;
+      const tab = this.tabs.get(this.activeTabId);
+      const branch = tab?.state.gitBranch;
+      if (branch) {
+        navigator.clipboard.writeText(branch).then(
+          () => showToast(`Copied: ${branch}`, "info", 2000),
+          () => {},
+        );
+      }
+    });
+
+    document.getElementById("status-server")?.addEventListener("click", () => {
+      if (!this.activeTabId) return;
+      const tab = this.tabs.get(this.activeTabId);
+      const port = tab?.state.serverPort;
+      if (port) {
+        try {
+          window.open(`http://localhost:${port}`, "_blank");
+        } catch {
+          showToast(`Failed to open localhost:${port}`, "error");
+        }
+      }
+    });
   }
 
   private updateStatusBar() {

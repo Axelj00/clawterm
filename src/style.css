@@ -655,6 +655,23 @@ body {
   display: none;
 }
 
+#status-cwd,
+#status-git,
+#status-server {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  transition: background 0.1s;
+}
+
+#status-cwd:hover,
+#status-git:hover,
+#status-server:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
 #status-git {
   color: rgba(255, 255, 255, 0.5);
 }
