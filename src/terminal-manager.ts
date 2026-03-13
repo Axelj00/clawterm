@@ -167,6 +167,25 @@ export class TerminalManager {
       this.createTab();
     });
 
+    // Re-focus terminal when window regains focus (fixes Cmd+Tab focus loss)
+    win.onFocusChanged(({ payload: focused }) => {
+      if (focused && this.activeTabId) {
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab) requestAnimationFrame(() => tab.focus());
+      }
+    });
+
+    // Re-focus terminal when clicking on terminal area (e.g. wrapper padding)
+    document.getElementById("terminal-container")!.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).closest(".search-bar")) return;
+      if (this.activeTabId) {
+        requestAnimationFrame(() => {
+          const tab = this.tabs.get(this.activeTabId!);
+          tab?.focus();
+        });
+      }
+    });
+
     this.setupSidebarResize();
   }
 
@@ -303,7 +322,7 @@ export class TerminalManager {
     }
 
     // Cmd+1-9: switch to tab by index
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "9") {
+    if (e.metaKey && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "9") {
       e.preventDefault();
       const index = parseInt(e.key) - 1;
       const ids = Array.from(this.tabs.keys());
