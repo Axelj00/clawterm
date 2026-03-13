@@ -213,7 +213,7 @@ export class Pane {
     if (this.cwd) spawnOpts.cwd = this.cwd;
 
     try {
-      this.pty = spawn(this.config.shell, ["--login"], spawnOpts as any);
+      this.pty = spawn(this.config.shell, this.config.shellArgs, spawnOpts as any);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Failed to start shell: ${this.config.shell}`, "error", 8000);

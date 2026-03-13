@@ -31,6 +31,7 @@ export interface TerminalTheme {
 
 export interface Config {
   shell: string;
+  shellArgs: string[];
   font: {
     family: string;
     size: number;
@@ -91,8 +92,18 @@ export interface Config {
   };
 }
 
+/** Return appropriate default shell args based on shell name. */
+function defaultShellArgs(shell: string): string[] {
+  const basename = shell.split("/").pop()?.toLowerCase() ?? "";
+  // Most POSIX shells support --login for sourcing profile files.
+  // Nushell uses -l, fish supports --login.
+  if (basename === "nu" || basename === "nushell") return ["-l"];
+  return ["--login"];
+}
+
 const DEFAULT_CONFIG: Config = {
   shell: "/bin/zsh",
+  shellArgs: ["--login"],
   font: {
     family: "Menlo, Monaco, monospace",
     size: 14,
@@ -218,6 +229,13 @@ export function validateConfig(config: Config): Config {
     result.shell = DEFAULT_CONFIG.shell;
   }
 
+  // Shell args — default based on shell name if not explicitly set
+  if (!Array.isArray(result.shellArgs)) {
+    result.shellArgs = defaultShellArgs(result.shell);
+  } else {
+    result.shellArgs = result.shellArgs.filter((a) => typeof a === "string");
+  }
+
   // Font
   if (typeof result.font.size !== "number" || result.font.size < 6 || result.font.size > 72) {
     warn("font.size", "must be 6–72");
@@ -311,6 +329,10 @@ export async function loadConfig(): Promise<Config> {
     }
 
     const userConfig = JSON.parse(text);
+    // If user set a custom shell but didn't specify shellArgs, derive smart defaults
+    if (userConfig.shell && !userConfig.shellArgs) {
+      userConfig.shellArgs = defaultShellArgs(userConfig.shell);
+    }
     const validated = validateConfig(deepMerge(DEFAULT_CONFIG, userConfig));
 
     // Check shell path exists and is executable on disk
