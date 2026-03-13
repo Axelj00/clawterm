@@ -138,6 +138,14 @@ mod platform {
             current_pid = child_pid;
         }
 
+        // If the process name is a runtime (node, python, etc.), check
+        // the command-line args for a more descriptive program name.
+        if matches!(current_name.as_str(), "node" | "python" | "python3" | "ruby") {
+            if let Some(friendly) = friendly_name_from_args(current_pid) {
+                current_name = friendly;
+            }
+        }
+
         Ok(ProcessInfo {
             name: current_name,
             pid: current_pid,
@@ -188,6 +196,104 @@ mod platform {
                     .unwrap_or("")
                     .to_string(),
             )
+        }
+    }
+
+    /// Read the command-line args of a process and return a friendly name
+    /// if the first script arg matches a known tool (e.g. claude, aider).
+    fn friendly_name_from_args(pid: u32) -> Option<String> {
+        let args = get_proc_args(pid)?;
+        // args[0] is the executable (e.g. /usr/local/bin/node).
+        // Look through the remaining args for a recognizable script name.
+        for arg in args.iter().skip(1) {
+            // Skip flags
+            if arg.starts_with('-') {
+                continue;
+            }
+            let basename = std::path::Path::new(arg)
+                .file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default()
+                .to_lowercase();
+            // Strip common extensions
+            let name = basename
+                .trim_end_matches(".js")
+                .trim_end_matches(".mjs")
+                .trim_end_matches(".cjs")
+                .trim_end_matches(".py")
+                .trim_end_matches(".rb");
+            if matches!(name, "claude" | "claude-code" | "aider" | "copilot" | "cursor") {
+                return Some(name.to_string());
+            }
+            // First non-flag arg checked; stop to avoid false positives
+            break;
+        }
+        None
+    }
+
+    /// Read the command-line arguments of a process via sysctl KERN_PROCARGS2.
+    fn get_proc_args(pid: u32) -> Option<Vec<String>> {
+        unsafe {
+            let mut mib = [libc::CTL_KERN, libc::KERN_PROCARGS2, pid as libc::c_int];
+            let mut size: libc::size_t = 0;
+
+            // First call: get buffer size
+            if libc::sysctl(
+                mib.as_mut_ptr(),
+                3,
+                std::ptr::null_mut(),
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            ) != 0 {
+                return None;
+            }
+
+            let mut buf = vec![0u8; size];
+            if libc::sysctl(
+                mib.as_mut_ptr(),
+                3,
+                buf.as_mut_ptr() as *mut libc::c_void,
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            ) != 0 {
+                return None;
+            }
+
+            if size < 4 {
+                return None;
+            }
+
+            // Format: argc (i32), exec path (NUL-terminated), NUL padding, then argv strings
+            let argc = i32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+
+            let mut pos = 4;
+            // Skip the executable path
+            while pos < size && buf[pos] != 0 {
+                pos += 1;
+            }
+            // Skip NUL padding
+            while pos < size && buf[pos] == 0 {
+                pos += 1;
+            }
+
+            let mut args = Vec::with_capacity(argc);
+            for _ in 0..argc {
+                if pos >= size {
+                    break;
+                }
+                let start = pos;
+                while pos < size && buf[pos] != 0 {
+                    pos += 1;
+                }
+                if let Ok(s) = std::str::from_utf8(&buf[start..pos]) {
+                    args.push(s.to_string());
+                }
+                pos += 1; // skip NUL terminator
+            }
+
+            Some(args)
         }
     }
 
