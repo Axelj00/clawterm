@@ -10,7 +10,6 @@
  */
 
 import { readFileSync, writeFileSync } from "fs";
-import { execSync } from "child_process";
 
 const FILES = [
   { path: "package.json", pattern: /"version":\s*"[^"]+"/, template: (v) => `"version": "${v}"` },
