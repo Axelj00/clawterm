@@ -524,6 +524,9 @@ export class Tab {
         this.lastRunningAt = Date.now();
         const agentId = AGENT_PROCESS_MAP[procInfo.name.toLowerCase()];
         if (agentId) {
+          if (this.state.agentName !== agentId) {
+            this.state.agentStartedAt = Date.now();
+          }
           this.state.agentName = agentId;
           if (this.state.activity === "idle") {
             this.state.activity = "running";
@@ -545,6 +548,7 @@ export class Tab {
         if (this.lastRunningAt === 0 || timeSinceRunning >= Tab.IDLE_GRACE_MS) {
           this.state.activity = "idle";
           this.state.agentName = null;
+          this.state.agentStartedAt = null;
           this.state.lastError = null;
         }
       }

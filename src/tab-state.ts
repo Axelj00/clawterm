@@ -11,6 +11,8 @@ export interface TabState {
   projectName: string | null;
   lastError: string | null;
   gitBranch: string | null;
+  /** Timestamp when the current agent session started */
+  agentStartedAt: number | null;
 }
 
 export function createDefaultTabState(): TabState {
@@ -25,6 +27,7 @@ export function createDefaultTabState(): TabState {
     projectName: null,
     lastError: null,
     gitBranch: null,
+    agentStartedAt: null,
   };
 }
 
@@ -40,11 +43,26 @@ export function computeDisplayTitle(state: TabState): string {
   return `${project} — ${state.processName}`;
 }
 
+function formatElapsed(startMs: number): string {
+  const secs = Math.floor((Date.now() - startMs) / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m`;
+}
+
 export function computeSubtitle(state: TabState): string | null {
-  if (state.activity === "agent-waiting") return "waiting for input";
+  if (state.activity === "agent-waiting") {
+    const elapsed = state.agentStartedAt ? ` (${formatElapsed(state.agentStartedAt)})` : "";
+    return `waiting for input${elapsed}`;
+  }
   if (state.serverPort) return `localhost:${state.serverPort}`;
   if (state.lastError) return state.lastError;
-  if (state.agentName && state.activity === "running") return state.agentName;
+  if (state.agentName && state.activity === "running") {
+    const elapsed = state.agentStartedAt ? ` ${formatElapsed(state.agentStartedAt)}` : "";
+    return `${state.agentName}${elapsed}`;
+  }
   if (!state.isIdle && state.processName && state.activity === "running") return state.processName;
   return null;
 }
