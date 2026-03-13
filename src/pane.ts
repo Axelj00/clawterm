@@ -152,12 +152,11 @@ export class Pane {
       cols,
       rows,
       name: "xterm-256color",
-      env: { TERM: "xterm-256color", COLORTERM: "truecolor" },
     };
     if (this.cwd) spawnOpts.cwd = this.cwd;
 
     try {
-      this.pty = spawn(this.config.shell, [], spawnOpts as any);
+      this.pty = spawn(this.config.shell, ["--login"], spawnOpts as any);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Failed to start shell: ${this.config.shell}`, "error", 8000);
