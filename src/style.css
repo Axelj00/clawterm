@@ -25,7 +25,7 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--sidebar-bg);
+  background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
 }

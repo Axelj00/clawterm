@@ -173,7 +173,25 @@ export class Tab {
   /** Split the focused pane in the given direction */
   async split(direction: SplitDirection) {
     const paneToSplit = this.focusedPane;
-    const newPane = this.createPane(paneToSplit.lastFullCwd ?? this.cwd);
+
+    // Query the current CWD from the pane's process in real-time
+    let cwd: string | undefined = paneToSplit.lastFullCwd ?? this.cwd;
+    if (paneToSplit.ptyPid) {
+      try {
+        const timeout = this.config.advanced.ipcTimeoutMs;
+        const fg = await invokeWithTimeout<{ name: string; pid: number }>(
+          "get_foreground_process",
+          { pid: paneToSplit.ptyPid },
+          timeout,
+        );
+        const liveCwd = await invokeWithTimeout<string>("get_process_cwd_full", { pid: fg.pid }, timeout);
+        if (liveCwd) cwd = liveCwd;
+      } catch (e) {
+        logger.debug("Failed to get CWD for split:", e);
+      }
+    }
+
+    const newPane = this.createPane(cwd);
 
     // Find the leaf node for the focused pane and replace it with a split
     const splitContainer = document.createElement("div");
