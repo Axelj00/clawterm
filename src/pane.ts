@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { spawn, type IPty } from "tauri-pty";
 import type { Config } from "./config";
 import { OutputAnalyzer } from "./output-analyzer";
@@ -156,6 +157,13 @@ export class Pane {
 
   async start(): Promise<boolean> {
     this.terminal.open(this.element);
+
+    // WebGL renderer — must load after open(); falls back to canvas silently
+    try {
+      this.terminal.loadAddon(new WebglAddon());
+    } catch {
+      // WebGL not available, canvas fallback is automatic
+    }
 
     await new Promise((r) => requestAnimationFrame(r));
     this.fitAddon.fit();
