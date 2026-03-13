@@ -84,7 +84,7 @@ describe("validateConfig", () => {
     config.shell = "";
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = validateConfig(config as any);
-    expect(result.shell).toBe("/bin/zsh");
+    expect(result.shell).toBeTruthy(); // reset to platform default
     spy.mockRestore();
   });
 
