@@ -48,6 +48,7 @@ export class TerminalManager {
   private lastBackgroundPoll = 0;
   private dragTabId: string | null = null;
   private tabElements: Map<string, HTMLElement> = new Map();
+  private lastTabSnapshot = "";
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
 
   async init() {
@@ -999,9 +1000,25 @@ export class TerminalManager {
         }
       }
 
-      this.renderTabList();
+      const snapshot = this.computeTabSnapshot();
+      if (snapshot !== this.lastTabSnapshot) {
+        this.lastTabSnapshot = snapshot;
+        this.renderTabList();
+      }
       this.updateStatusBar();
     }, fgInterval);
+  }
+
+  private computeTabSnapshot(): string {
+    const parts: string[] = [];
+    for (const [id, tab] of this.tabs) {
+      const s = tab.state;
+      parts.push(
+        `${id}|${tab.title}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}`,
+      );
+    }
+    parts.push(`active:${this.activeTabId}`);
+    return parts.join(";");
   }
 
   private setupResize() {
