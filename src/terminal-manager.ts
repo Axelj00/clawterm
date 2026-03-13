@@ -47,6 +47,7 @@ export class TerminalManager {
   private lastBackgroundPoll = 0;
   private dragTabId: string | null = null;
   private tabElements: Map<string, HTMLElement> = new Map();
+  private sessionTimer: ReturnType<typeof setTimeout> | null = null;
 
   async init() {
     this.config = await loadConfig();
@@ -414,16 +415,21 @@ export class TerminalManager {
   }
 
   private persistSession() {
-    const tabs: SessionTab[] = [];
-    for (const tab of this.tabs.values()) {
-      tabs.push({
-        title: tab.manualTitle,
-        cwd: tab.lastFullCwd ?? "",
-      });
-    }
-    const ids = Array.from(this.tabs.keys());
-    const activeIndex = this.activeTabId ? ids.indexOf(this.activeTabId) : 0;
-    saveSession(tabs, Math.max(0, activeIndex));
+    // Debounce: multiple rapid calls (tab switch, create, close) coalesce
+    // into a single write after 500ms of quiet
+    if (this.sessionTimer) clearTimeout(this.sessionTimer);
+    this.sessionTimer = setTimeout(() => {
+      const tabs: SessionTab[] = [];
+      for (const tab of this.tabs.values()) {
+        tabs.push({
+          title: tab.manualTitle,
+          cwd: tab.lastFullCwd ?? "",
+        });
+      }
+      const ids = Array.from(this.tabs.keys());
+      const activeIndex = this.activeTabId ? ids.indexOf(this.activeTabId) : 0;
+      saveSession(tabs, Math.max(0, activeIndex));
+    }, 500);
   }
 
   private handleTabOutputEvent(tabId: string, tab: Tab, event: OutputEvent) {

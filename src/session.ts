@@ -17,7 +17,18 @@ export async function loadSession(): Promise<Session | null> {
     if (!text) return null;
     const data = JSON.parse(text);
     if (!Array.isArray(data.tabs) || data.tabs.length === 0) return null;
-    return data as Session;
+
+    // Validate each tab has a cwd string; discard malformed entries
+    const validTabs = data.tabs.filter(
+      (t: unknown) =>
+        t && typeof t === "object" && typeof (t as SessionTab).cwd === "string",
+    );
+    if (validTabs.length === 0) return null;
+
+    const activeIndex =
+      typeof data.activeIndex === "number" ? Math.max(0, Math.min(data.activeIndex, validTabs.length - 1)) : 0;
+
+    return { tabs: validTabs, activeIndex };
   } catch (e) {
     logger.debug("Failed to load session:", e);
     return null;
