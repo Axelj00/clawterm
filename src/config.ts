@@ -40,6 +40,7 @@ export interface Config {
     style: "bar" | "block" | "underline";
     blink: boolean;
   };
+  scrollback: number;
   copyOnSelect: boolean;
   sidebar: {
     width: number;
@@ -101,6 +102,7 @@ const DEFAULT_CONFIG: Config = {
     style: "bar",
     blink: true,
   },
+  scrollback: 5000,
   copyOnSelect: false,
   sidebar: {
     width: 200,
@@ -228,6 +230,12 @@ export function validateConfig(config: Config): Config {
   ) {
     warn("font.lineHeight", "must be 0.5–3");
     result.font = { ...result.font, lineHeight: DEFAULT_CONFIG.font.lineHeight };
+  }
+
+  // Scrollback
+  if (typeof result.scrollback !== "number" || result.scrollback < 100 || result.scrollback > 100000) {
+    warn("scrollback", "must be 100–100000");
+    result.scrollback = DEFAULT_CONFIG.scrollback;
   }
 
   // Cursor

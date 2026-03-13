@@ -54,6 +54,7 @@ export class Pane {
       fontSize: config.font.size,
       fontFamily: config.font.family,
       lineHeight: config.font.lineHeight,
+      scrollback: config.scrollback,
       theme: config.theme.terminal,
       allowProposedApi: true,
       macOptionIsMeta: true,
