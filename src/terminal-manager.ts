@@ -52,6 +52,7 @@ export class TerminalManager {
   private lastTabSnapshot = "";
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
   private shortcutsPanelEl: HTMLDivElement | null = null;
+  private creatingTab = false;
 
   async init() {
     this.config = await loadConfig();
@@ -70,7 +71,7 @@ export class TerminalManager {
     const session = await loadSession();
     if (session && session.tabs.length > 0) {
       for (const savedTab of session.tabs) {
-        await this.createTab(savedTab.cwd, savedTab.title);
+        await this.createTab(savedTab.cwd);
       }
       // Switch to the previously active tab
       const ids = Array.from(this.tabs.keys());
@@ -370,7 +371,19 @@ export class TerminalManager {
     return true; // not handled, pass to xterm
   };
 
-  async createTab(restoreCwd?: string, restoreTitle?: string | null) {
+  async createTab(restoreCwd?: string) {
+    // Guard against concurrent tab creation (e.g. rapid button clicks)
+    if (this.creatingTab) return;
+    this.creatingTab = true;
+
+    try {
+      await this._createTab(restoreCwd);
+    } finally {
+      this.creatingTab = false;
+    }
+  }
+
+  private async _createTab(restoreCwd?: string) {
     if (this.tabs.size >= this.config.maxTabs) {
       const agentEl = document.getElementById("status-agent");
       if (agentEl) {
@@ -410,10 +423,6 @@ export class TerminalManager {
     }
 
     const tab = new Tab(id, title, this.config, this.handleKey, cwd);
-    if (restoreTitle) {
-      tab.title = restoreTitle;
-      tab.manualTitle = restoreTitle;
-    }
 
     tab.onExit = () => {
       this.serverTracker.removeServer(id);
@@ -697,44 +706,6 @@ export class TerminalManager {
     cancelBtn.focus();
   }
 
-  private startRenameTab(id: string) {
-    const tab = this.tabs.get(id);
-    if (!tab) return;
-
-    const entry = document.querySelector(`.tab-entry[data-id="${id}"]`);
-    if (!entry) return;
-
-    const titleEl = entry.querySelector(".tab-title") as HTMLElement;
-    if (!titleEl) return;
-
-    const input = document.createElement("input");
-    input.className = "tab-title-input";
-    input.value = tab.title;
-
-    const commit = () => {
-      const newTitle = input.value.trim() || tab.title;
-      tab.title = newTitle;
-      tab.manualTitle = newTitle;
-      this.renderTabList();
-      this.persistSession();
-    };
-
-    input.addEventListener("blur", commit);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        commit();
-      }
-      if (e.key === "Escape") {
-        this.renderTabList();
-      }
-    });
-
-    titleEl.replaceWith(input);
-    input.focus();
-    input.select();
-  }
-
   private showTabContextMenu(e: MouseEvent, tabId: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -743,10 +714,6 @@ export class TerminalManager {
     if (!tab) return;
 
     const items: ContextMenuItem[] = [
-      {
-        label: "Rename",
-        action: () => this.startRenameTab(tabId),
-      },
       {
         label: "Close",
         action: () => this.closeTab(tabId),
@@ -869,10 +836,6 @@ export class TerminalManager {
         entry.appendChild(close);
 
         entry.addEventListener("click", () => this.switchToTab(id));
-        entry.addEventListener("dblclick", (e) => {
-          e.preventDefault();
-          this.startRenameTab(id);
-        });
         entry.addEventListener("contextmenu", (e) => {
           this.showTabContextMenu(e, id);
         });
