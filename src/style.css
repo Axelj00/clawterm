@@ -615,7 +615,8 @@ body {
   transition: background 0.1s;
 }
 
-.context-menu-item:hover {
+.context-menu-item:hover,
+.context-menu-item.focused {
   background: var(--sidebar-accent);
   color: white;
 }
