@@ -471,17 +471,19 @@ export class TerminalManager {
   }
 
   private nextTab() {
+    if (!this.activeTabId) return;
     const ids = Array.from(this.tabs.keys());
     if (ids.length <= 1) return;
-    const currentIndex = ids.indexOf(this.activeTabId!);
+    const currentIndex = ids.indexOf(this.activeTabId);
     const nextIndex = (currentIndex + 1) % ids.length;
     this.switchToTab(ids[nextIndex]);
   }
 
   private prevTab() {
+    if (!this.activeTabId) return;
     const ids = Array.from(this.tabs.keys());
     if (ids.length <= 1) return;
-    const currentIndex = ids.indexOf(this.activeTabId!);
+    const currentIndex = ids.indexOf(this.activeTabId);
     const prevIndex = (currentIndex - 1 + ids.length) % ids.length;
     this.switchToTab(ids[prevIndex]);
   }
