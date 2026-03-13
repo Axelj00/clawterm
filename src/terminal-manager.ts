@@ -10,6 +10,7 @@ import { showContextMenu, type ContextMenuItem } from "./context-menu";
 import { TabSwitcher, type SwitcherTab } from "./tab-switcher";
 import type { OutputEvent } from "./matchers";
 import { logger } from "./logger";
+import { showToast } from "./toast";
 import { modLabel } from "./utils";
 import { loadSession, saveSession, type SessionTab } from "./session";
 
@@ -713,7 +714,11 @@ export class TerminalManager {
         label: `Open localhost:${server.port} in Browser`,
         separator: true,
         action: () => {
-          window.open(`http://localhost:${server.port}`, "_blank");
+          try {
+            window.open(`http://localhost:${server.port}`, "_blank");
+          } catch {
+            showToast(`Failed to open localhost:${server.port}`, "error");
+          }
         },
       });
     }
@@ -723,7 +728,9 @@ export class TerminalManager {
       label: "Copy Working Directory",
       separator: !server,
       action: () => {
-        navigator.clipboard.writeText(tab.state.folderName);
+        navigator.clipboard.writeText(tab.state.folderName).catch(() => {
+          showToast("Failed to copy to clipboard", "error");
+        });
       },
     });
 
