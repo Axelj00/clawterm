@@ -7,7 +7,7 @@ export async function checkForUpdates(): Promise<void> {
     if (!update) return;
 
     logger.debug(`Update available: ${update.version}`);
-    showUpdateBanner(update.version, async () => {
+    showUpdateNotice(update.version, async () => {
       try {
         await update.downloadAndInstall();
         const { relaunch } = await import("@tauri-apps/plugin-process");
@@ -22,24 +22,30 @@ export async function checkForUpdates(): Promise<void> {
   }
 }
 
-function showUpdateBanner(version: string, onInstall: () => void): void {
-  const banner = document.createElement("div");
-  banner.className = "update-banner";
-  banner.innerHTML = `
-    <span>Clawterm ${version} is available</span>
-    <button class="update-btn">Update & Restart</button>
-    <button class="update-dismiss">✕</button>
+function showUpdateNotice(version: string, onInstall: () => void): void {
+  const footer = document.getElementById("sidebar-footer");
+  if (!footer) return;
+
+  const notice = document.createElement("div");
+  notice.className = "update-notice";
+  notice.innerHTML = `
+    <div class="update-notice-dot"></div>
+    <div class="update-notice-text">
+      <span class="update-notice-label">Update available</span>
+      <span class="update-notice-version">${version}</span>
+    </div>
+    <button class="update-notice-action">Update</button>
   `;
-  document.body.appendChild(banner);
 
-  banner.querySelector(".update-btn")!.addEventListener("click", () => {
-    const btn = banner.querySelector(".update-btn") as HTMLButtonElement;
-    btn.textContent = "Installing...";
+  // Insert above the new tab button
+  footer.insertBefore(notice, footer.firstChild);
+
+  notice.querySelector(".update-notice-action")!.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const btn = notice.querySelector(".update-notice-action") as HTMLButtonElement;
+    btn.textContent = "Installing…";
     btn.disabled = true;
+    notice.classList.add("installing");
     onInstall();
-  });
-
-  banner.querySelector(".update-dismiss")!.addEventListener("click", () => {
-    banner.remove();
   });
 }
