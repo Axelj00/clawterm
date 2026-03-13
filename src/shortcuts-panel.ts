@@ -47,6 +47,7 @@ function buildGroups(config: Config): ShortcutGroup[] {
     {
       title: "Terminal",
       entries: [
+        { label: "Command palette", binding: kb.commandPalette },
         { label: "Search", binding: kb.search },
         { label: "Reload config", binding: kb.reloadConfig },
         { label: "Cycle attention tabs", binding: kb.cycleAttention },

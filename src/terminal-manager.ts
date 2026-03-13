@@ -14,6 +14,7 @@ import { showToast } from "./toast";
 import { modLabel } from "./utils";
 import { loadSession, saveSession, type SessionTab } from "./session";
 import { createShortcutsPanel } from "./shortcuts-panel";
+import { showCommandPalette, type PaletteCommand } from "./command-palette";
 
 function el(tag: string, attrs?: Record<string, string>, ...children: (HTMLElement | string)[]): HTMLElement {
   const e = document.createElement(tag);
@@ -334,6 +335,12 @@ export class TerminalManager {
       return false;
     }
 
+    if (matchesKeybinding(e, kb.commandPalette)) {
+      e.preventDefault();
+      this.openCommandPalette();
+      return false;
+    }
+
     if (matchesKeybinding(e, kb.splitHorizontal)) {
       e.preventDefault();
       this.splitActiveTab("horizontal");
@@ -620,6 +627,101 @@ export class TerminalManager {
     this.shortcutsPanelEl = createShortcutsPanel(this.config);
     container.appendChild(this.shortcutsPanelEl);
     document.getElementById("shortcuts-btn")?.classList.add("active");
+  }
+
+  private openCommandPalette() {
+    const commands: PaletteCommand[] = [
+      { id: "new-tab", label: "New Tab", category: "Tabs", action: () => this.createTab() },
+      {
+        id: "close-tab",
+        label: "Close Tab",
+        category: "Tabs",
+        action: () => {
+          if (this.activeTabId) this.closeTab(this.activeTabId);
+        },
+      },
+      { id: "next-tab", label: "Next Tab", category: "Tabs", action: () => this.nextTab() },
+      { id: "prev-tab", label: "Previous Tab", category: "Tabs", action: () => this.prevTab() },
+      {
+        id: "split-right",
+        label: "Split Right",
+        category: "Panes",
+        action: () => this.splitActiveTab("horizontal"),
+      },
+      {
+        id: "split-down",
+        label: "Split Down",
+        category: "Panes",
+        action: () => this.splitActiveTab("vertical"),
+      },
+      { id: "close-pane", label: "Close Pane", category: "Panes", action: () => this.closeActivePane() },
+      {
+        id: "focus-next-pane",
+        label: "Focus Next Pane",
+        category: "Panes",
+        action: () => this.tabs.get(this.activeTabId!)?.focusNextPane(),
+      },
+      {
+        id: "search",
+        label: "Find in Terminal",
+        category: "Terminal",
+        action: () => this.tabs.get(this.activeTabId!)?.toggleSearch(),
+      },
+      { id: "reload-config", label: "Reload Config", category: "Terminal", action: () => this.reloadConfig() },
+      {
+        id: "shortcuts",
+        label: "Keyboard Shortcuts",
+        category: "Terminal",
+        action: () => this.toggleShortcutsPanel(),
+      },
+      {
+        id: "cycle-attention",
+        label: "Cycle Attention Tabs",
+        category: "Tabs",
+        action: () => this.cycleAttentionTabs(),
+      },
+      { id: "quick-switch", label: "Quick Switch", category: "Tabs", action: () => this.showQuickSwitch() },
+    ];
+
+    // Add pinning for active tab
+    if (this.activeTabId) {
+      const tab = this.tabs.get(this.activeTabId);
+      if (tab) {
+        commands.push({
+          id: "toggle-pin",
+          label: tab.pinned ? "Unpin Tab" : "Pin Tab",
+          category: "Tabs",
+          action: () => {
+            tab.pinned = !tab.pinned;
+            this.renderTabList();
+          },
+        });
+        commands.push({
+          id: "kill-process",
+          label: "Kill Process",
+          category: "Terminal",
+          action: () => tab.sendInterrupt(),
+        });
+        commands.push({
+          id: "restart-shell",
+          label: "Restart Shell",
+          category: "Terminal",
+          action: () => tab.restartShell(),
+        });
+      }
+    }
+
+    // Add startup commands
+    for (const [name, cmd] of Object.entries(this.config.startupCommands)) {
+      commands.push({
+        id: `startup-${name}`,
+        label: `New Tab: ${name}`,
+        category: "Tabs",
+        action: () => this.createTab(undefined, cmd),
+      });
+    }
+
+    showCommandPalette(commands);
   }
 
   private splitActiveTab(direction: "horizontal" | "vertical") {

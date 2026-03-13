@@ -73,6 +73,7 @@ export interface Config {
     closePane: string;
     focusNextPane: string;
     focusPrevPane: string;
+    commandPalette: string;
     [key: string]: string;
   };
   quickCommands: Record<string, string>;
@@ -170,6 +171,7 @@ const DEFAULT_CONFIG: Config = {
     closePane: `${modKey}+shift+w`,
     focusNextPane: `${modKey}+]`,
     focusPrevPane: `${modKey}+[`,
+    commandPalette: `${modKey}+shift+p`,
   },
   quickCommands: {
     [`${modKey}+shift+c`]: "claude --dangerously-skip-permissions\n",
