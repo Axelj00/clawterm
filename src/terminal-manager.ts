@@ -13,6 +13,7 @@ import { logger } from "./logger";
 import { showToast } from "./toast";
 import { modLabel } from "./utils";
 import { loadSession, saveSession, type SessionTab } from "./session";
+import { createShortcutsPanel } from "./shortcuts-panel";
 
 function el(tag: string, attrs?: Record<string, string>, ...children: (HTMLElement | string)[]): HTMLElement {
   const e = document.createElement(tag);
@@ -50,6 +51,7 @@ export class TerminalManager {
   private tabElements: Map<string, HTMLElement> = new Map();
   private lastTabSnapshot = "";
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
+  private shortcutsPanelEl: HTMLDivElement | null = null;
 
   async init() {
     this.config = await loadConfig();
@@ -130,7 +132,16 @@ export class TerminalManager {
           "div",
           { id: "sidebar" },
           el("div", { id: "tab-list", role: "tablist", "aria-label": "Terminal tabs" }),
-          el("div", { id: "sidebar-footer" }, el("button", { id: "new-tab-btn" }, "+ New Tab")),
+          el(
+            "div",
+            { id: "sidebar-footer" },
+            el("button", { id: "new-tab-btn" }, "+ New Tab"),
+            el(
+              "button",
+              { id: "shortcuts-btn", "aria-label": "Keyboard shortcuts", title: "Keyboard Shortcuts" },
+              "\u2328",
+            ),
+          ),
         ),
         el("div", { id: "sidebar-divider" }),
         el(
@@ -168,6 +179,10 @@ export class TerminalManager {
 
     document.getElementById("new-tab-btn")!.addEventListener("click", () => {
       this.createTab();
+    });
+
+    document.getElementById("shortcuts-btn")!.addEventListener("click", () => {
+      this.toggleShortcutsPanel();
     });
 
     // Re-focus terminal when window regains focus (fixes Cmd+Tab focus loss)
@@ -473,6 +488,13 @@ export class TerminalManager {
       if (current) current.hide();
     }
 
+    // Dismiss shortcuts panel if open
+    if (this.shortcutsPanelEl) {
+      this.shortcutsPanelEl.remove();
+      this.shortcutsPanelEl = null;
+      document.getElementById("shortcuts-btn")?.classList.remove("active");
+    }
+
     this.activeTabId = id;
     const tab = this.tabs.get(id);
     if (tab) tab.show();
@@ -534,6 +556,32 @@ export class TerminalManager {
     // Interpret escape sequences like \n
     const resolved = text.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
     tab.writeToPty(resolved);
+  }
+
+  private toggleShortcutsPanel() {
+    const container = document.getElementById("terminal-container")!;
+
+    // If panel is showing, remove it and restore the active tab
+    if (this.shortcutsPanelEl) {
+      this.shortcutsPanelEl.remove();
+      this.shortcutsPanelEl = null;
+      document.getElementById("shortcuts-btn")?.classList.remove("active");
+      if (this.activeTabId) {
+        const tab = this.tabs.get(this.activeTabId);
+        tab?.show();
+      }
+      return;
+    }
+
+    // Hide the active tab and show the shortcuts panel
+    if (this.activeTabId) {
+      const tab = this.tabs.get(this.activeTabId);
+      tab?.hide();
+    }
+
+    this.shortcutsPanelEl = createShortcutsPanel(this.config);
+    container.appendChild(this.shortcutsPanelEl);
+    document.getElementById("shortcuts-btn")?.classList.add("active");
   }
 
   private splitActiveTab(direction: "horizontal" | "vertical") {

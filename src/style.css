@@ -398,6 +398,92 @@ body {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
+#shortcuts-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: var(--sidebar-tab-text);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.12s ease;
+  -webkit-app-region: no-drag;
+}
+
+#shortcuts-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+#shortcuts-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Shortcuts panel */
+.shortcuts-panel {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 40px 48px;
+  background: var(--terminal-bg, #000);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  z-index: 5;
+}
+
+.shortcuts-header {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 4px;
+}
+
+.shortcuts-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 28px;
+}
+
+.shortcuts-group {
+  margin-bottom: 24px;
+}
+
+.shortcuts-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 8px;
+}
+
+.shortcuts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.shortcuts-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.shortcuts-kbd {
+  font-family: -apple-system, BlinkMacSystemFont, monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
 /* Sidebar resize divider */
 #sidebar-divider {
   width: 4px;
