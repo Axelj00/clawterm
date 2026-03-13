@@ -42,8 +42,8 @@ export class TerminalManager {
   private serverTracker!: ServerTracker;
   private tabSwitcher = new TabSwitcher();
   private resizeObserver: ResizeObserver | null = null;
-  // @ts-expect-error stored for lifecycle management
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private unlistenFocus: (() => void) | null = null;
   private lastBackgroundPoll = 0;
   private dragTabId: string | null = null;
   private tabElements: Map<string, HTMLElement> = new Map();
@@ -174,6 +174,8 @@ export class TerminalManager {
         const tab = this.tabs.get(this.activeTabId);
         if (tab) requestAnimationFrame(() => tab.focus());
       }
+    }).then((unlisten) => {
+      this.unlistenFocus = unlisten;
     });
 
     // Re-focus terminal when clicking on terminal area (e.g. wrapper padding)
@@ -992,5 +994,29 @@ export class TerminalManager {
       }
     });
     this.resizeObserver.observe(document.getElementById("terminal-container")!);
+  }
+
+  dispose() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    this.unlistenFocus?.();
+    this.unlistenFocus = null;
+    this.serverTracker.dispose();
+    this.notifications.dispose();
+    for (const tab of this.tabs.values()) {
+      tab.dispose();
+    }
+    this.tabs.clear();
+    this.tabElements.clear();
   }
 }

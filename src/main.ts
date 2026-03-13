@@ -6,5 +6,8 @@ import { checkForUpdates } from "./updater";
 const manager = new TerminalManager();
 manager.init();
 
+// Clean up resources on window close
+window.addEventListener("beforeunload", () => manager.dispose());
+
 // Check for updates after a short delay to not block startup
 setTimeout(checkForUpdates, 3000);
