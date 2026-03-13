@@ -1,11 +1,25 @@
 import { check } from "@tauri-apps/plugin-updater";
 import { logger } from "./logger";
 
-export async function checkForUpdates(): Promise<void> {
+const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+let updateFound = false;
+
+export function startUpdateChecker(): void {
+  // First check after 3 seconds
+  setTimeout(checkForUpdates, 3000);
+
+  // Then check periodically
+  setInterval(() => {
+    if (!updateFound) checkForUpdates();
+  }, CHECK_INTERVAL_MS);
+}
+
+async function checkForUpdates(): Promise<void> {
   try {
     const update = await check();
     if (!update) return;
 
+    updateFound = true;
     logger.debug(`Update available: ${update.version}`);
     showUpdateNotice(update.version, async () => {
       try {
@@ -17,7 +31,6 @@ export async function checkForUpdates(): Promise<void> {
       }
     });
   } catch (e) {
-    // Silently ignore — updater may not be configured yet
     logger.debug("Update check skipped:", e);
   }
 }
@@ -25,6 +38,9 @@ export async function checkForUpdates(): Promise<void> {
 function showUpdateNotice(version: string, onInstall: () => void): void {
   const footer = document.getElementById("sidebar-footer");
   if (!footer) return;
+
+  // Don't show duplicate notices
+  if (footer.querySelector(".update-notice")) return;
 
   const notice = document.createElement("div");
   notice.className = "update-notice";
@@ -37,7 +53,6 @@ function showUpdateNotice(version: string, onInstall: () => void): void {
     <button class="update-notice-action">Update</button>
   `;
 
-  // Insert above the new tab button
   footer.insertBefore(notice, footer.firstChild);
 
   notice.querySelector(".update-notice-action")!.addEventListener("click", (e) => {
