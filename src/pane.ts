@@ -4,6 +4,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { ImageAddon } from "@xterm/addon-image";
 import { spawn, type IPty } from "tauri-pty";
 import type { Config } from "./config";
 import { OutputAnalyzer } from "./output-analyzer";
@@ -216,6 +217,13 @@ export class Pane {
       this.terminal.loadAddon(new WebglAddon());
     } catch {
       // WebGL not available, canvas fallback is automatic
+    }
+
+    // Inline image support (Sixel + iTerm2 IIP)
+    try {
+      this.terminal.loadAddon(new ImageAddon());
+    } catch {
+      // Image addon may fail if WebGL is unavailable
     }
 
     // Register file path link provider (click to copy path)
