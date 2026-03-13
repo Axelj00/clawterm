@@ -183,6 +183,27 @@ export class TerminalManager {
       this.createTab();
     });
 
+    // Right-click on new-tab button shows startup command options
+    document.getElementById("new-tab-btn")!.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const items: ContextMenuItem[] = [
+        { label: "New Tab", action: () => this.createTab() },
+      ];
+      const cmds = this.config.startupCommands;
+      if (Object.keys(cmds).length > 0) {
+        let first = true;
+        for (const [name, cmd] of Object.entries(cmds)) {
+          items.push({
+            label: name,
+            separator: first,
+            action: () => this.createTab(undefined, cmd),
+          });
+          first = false;
+        }
+      }
+      showContextMenu(e.clientX, e.clientY, items);
+    });
+
     document.getElementById("shortcuts-btn")!.addEventListener("click", () => {
       this.toggleShortcutsPanel();
     });
@@ -372,19 +393,19 @@ export class TerminalManager {
     return true; // not handled, pass to xterm
   };
 
-  async createTab(restoreCwd?: string) {
+  async createTab(restoreCwd?: string, startupCommand?: string) {
     // Guard against concurrent tab creation (e.g. rapid button clicks)
     if (this.creatingTab) return;
     this.creatingTab = true;
 
     try {
-      await this._createTab(restoreCwd);
+      await this._createTab(restoreCwd, startupCommand);
     } finally {
       this.creatingTab = false;
     }
   }
 
-  private async _createTab(restoreCwd?: string) {
+  private async _createTab(restoreCwd?: string, startupCommand?: string) {
     if (this.tabs.size >= this.config.maxTabs) {
       const agentEl = document.getElementById("status-agent");
       if (agentEl) {
@@ -455,6 +476,13 @@ export class TerminalManager {
 
     // Extra focus after a frame to ensure terminal is interactive
     requestAnimationFrame(() => tab.focus());
+
+    // Send startup command after a brief delay for shell init
+    if (startupCommand) {
+      const cmd = startupCommand.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+      setTimeout(() => tab.writeToPty(cmd.endsWith("\n") ? cmd : cmd + "\n"), 300);
+    }
+
     this.persistSession();
   }
 

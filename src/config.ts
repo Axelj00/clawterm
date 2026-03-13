@@ -76,6 +76,8 @@ export interface Config {
     [key: string]: string;
   };
   quickCommands: Record<string, string>;
+  /** Named startup commands for "New Tab with Command" menu */
+  startupCommands: Record<string, string>;
   maxTabs: number;
   maxPanes: number;
   outputAnalysis: {
@@ -172,6 +174,7 @@ const DEFAULT_CONFIG: Config = {
   quickCommands: {
     [`${modKey}+shift+c`]: "claude --dangerously-skip-permissions\n",
   },
+  startupCommands: {},
   maxTabs: 20,
   maxPanes: 16,
   outputAnalysis: {
@@ -295,6 +298,16 @@ export function validateConfig(config: Config): Config {
       } else if (typeof val !== "string") {
         warn(`quickCommands.${key}`, "value must be a string");
         delete (result.quickCommands as Record<string, string>)[key];
+      }
+    }
+  }
+
+  // Startup commands — validate string values
+  if (result.startupCommands && typeof result.startupCommands === "object") {
+    for (const [key, val] of Object.entries(result.startupCommands)) {
+      if (typeof val !== "string") {
+        warn(`startupCommands.${key}`, "value must be a string");
+        delete (result.startupCommands as Record<string, string>)[key];
       }
     }
   }
