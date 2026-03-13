@@ -14,9 +14,12 @@ function closeActiveMenu() {
   }
 }
 
-// Close on any click outside
+// Close on any click outside or Escape key
 document.addEventListener("click", closeActiveMenu);
 document.addEventListener("contextmenu", closeActiveMenu);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeActiveMenu();
+});
 
 export function showContextMenu(x: number, y: number, items: ContextMenuItem[]) {
   closeActiveMenu();
