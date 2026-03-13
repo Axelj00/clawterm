@@ -8,14 +8,9 @@ import { OutputAnalyzer } from "./output-analyzer";
 import type { OutputEvent } from "./matchers";
 import { SearchBar } from "./search-bar";
 import { logger } from "./logger";
-import { isMac } from "./utils";
 import { showToast } from "./toast";
 
 export type KeyHandler = (e: KeyboardEvent) => boolean;
-
-function shellEscape(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
 
 let paneCounter = 0;
 
@@ -58,8 +53,8 @@ export class Pane {
       lineHeight: config.font.lineHeight,
       theme: config.theme.terminal,
       allowProposedApi: true,
-      macOptionIsMeta: isMac,
-      macOptionClickForcesSelection: isMac,
+      macOptionIsMeta: true,
+      macOptionClickForcesSelection: true,
     });
 
     // Intercept keys before xterm processes them
@@ -68,7 +63,7 @@ export class Pane {
         return false;
       }
 
-      if (isMac && e.type === "keydown" && e.metaKey && this.pty && !this.disposed) {
+      if (e.type === "keydown" && e.metaKey && this.pty && !this.disposed) {
         if (e.key === "Backspace") {
           e.preventDefault();
           this.pty.write("\x15");
@@ -147,6 +142,7 @@ export class Pane {
       cols,
       rows,
       name: "xterm-256color",
+      env: { TERM: "xterm-256color", COLORTERM: "truecolor" },
     };
     if (this.cwd) spawnOpts.cwd = this.cwd;
 
@@ -159,17 +155,12 @@ export class Pane {
     }
     this.ptyPid = this.pty.pid;
 
-    let hasSentCd = false;
     this.pty.onData((data: Uint8Array | number[]) => {
       if (!this.disposed) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
         this.terminal.write(bytes);
         if (this.config.outputAnalysis?.enabled !== false) {
           this.analyzer.feed(bytes);
-        }
-        if (!hasSentCd && this.cwd && this.pty) {
-          hasSentCd = true;
-          this.pty.write(`cd ${shellEscape(this.cwd)} && clear\r`);
         }
       }
     });
@@ -227,17 +218,12 @@ export class Pane {
 
   dispose() {
     this.disposed = true;
-    if (this.pty) {
-      let exited = false;
-      this.pty.onExit(() => {
-        exited = true;
-      });
-      this.pty.kill();
-      setTimeout(() => {
-        if (!exited) {
-          logger.warn(`PTY for pane ${this.id} did not exit within 500ms after kill`);
-        }
-      }, 500);
+    // Capture and null PTY ref before kill to prevent double-dispose
+    // and block any further writes from terminal.onData / onResize
+    const pty = this.pty;
+    this.pty = null;
+    if (pty) {
+      pty.kill();
     }
     this.analyzer.dispose();
     this.searchBar?.dispose();
