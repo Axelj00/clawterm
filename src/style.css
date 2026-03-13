@@ -384,6 +384,11 @@ body {
   pointer-events: none;
 }
 
+/* Muted tab — dimmed icon */
+.tab-entry.muted .tab-icon {
+  opacity: 0.25;
+}
+
 /* Drag-and-drop reordering */
 .tab-entry.dragging {
   opacity: 0.4;

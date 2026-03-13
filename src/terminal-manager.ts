@@ -518,8 +518,10 @@ export class TerminalManager {
       this.serverTracker.addServer(tabId, event.port);
     }
 
-    // Forward to notifications
-    this.notifications.notify(event, tab.title, this.activeTabId === tabId);
+    // Forward to notifications (skip if tab is muted)
+    if (!tab.muted) {
+      this.notifications.notify(event, tab.title, this.activeTabId === tabId);
+    }
 
     // Re-render UI
     this.renderTabList();
@@ -860,6 +862,13 @@ export class TerminalManager {
         },
       },
       {
+        label: tab.muted ? "Unmute Notifications" : "Mute Notifications",
+        action: () => {
+          tab.muted = !tab.muted;
+          this.renderTabList();
+        },
+      },
+      {
         label: "Close",
         separator: true,
         disabled: tab.pinned,
@@ -1057,6 +1066,7 @@ export class TerminalManager {
       if (tab.state.activity === "agent-waiting") cls += " agent-waiting";
       if (tab.state.activity === "error") cls += " has-error";
       if (tab.pinned) cls += " pinned";
+      if (tab.muted) cls += " muted";
       entry.className = cls;
       entry.setAttribute("aria-selected", id === this.activeTabId ? "true" : "false");
 

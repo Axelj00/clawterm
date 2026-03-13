@@ -32,6 +32,7 @@ export class Tab {
   private isVisible = false;
   manualTitle: string | null = null;
   pinned = false;
+  muted = false;
   state: TabState = createDefaultTabState();
   private pollFailures = 0;
   private pollStopped = false;
@@ -123,7 +124,7 @@ export class Tab {
       case "agent-waiting":
         this.state.activity = "agent-waiting";
         if (event.agentName) this.state.agentName = event.agentName;
-        if (!this.isVisible) {
+        if (!this.isVisible && !this.muted) {
           this.state.needsAttention = true;
           this.onNeedsAttention?.();
         }
@@ -142,7 +143,7 @@ export class Tab {
         break;
       case "agent-completed":
         this.state.activity = "completed";
-        if (!this.isVisible) {
+        if (!this.isVisible && !this.muted) {
           this.state.needsAttention = true;
           this.onNeedsAttention?.();
         }
@@ -531,7 +532,7 @@ export class Tab {
         }
       }
 
-      if (!wasIdle && newIsIdle && !this.isVisible) {
+      if (!wasIdle && newIsIdle && !this.isVisible && !this.muted) {
         this.state.needsAttention = true;
         if (this.onNeedsAttention) this.onNeedsAttention();
       }
