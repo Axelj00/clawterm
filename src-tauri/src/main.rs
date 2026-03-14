@@ -109,6 +109,13 @@ fn main() {
             server_check::check_port,
             validate_shell,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                // Always clear session on quit so the app starts fresh.
+                // This runs on the Rust side, so it works even when JS is frozen.
+                let _ = clear_session();
+            }
+        });
 }
