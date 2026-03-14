@@ -433,7 +433,7 @@ export class Pane {
     const dismiss = () => {
       removeTrap();
       overlay.remove();
-      this.terminal.focus();
+      if (!this.disposed) this.terminal.focus();
     };
 
     cancelBtn.addEventListener("click", dismiss);
@@ -486,6 +486,8 @@ export class Pane {
 
   dispose() {
     this.disposed = true;
+    // Dismiss any open paste confirm dialog
+    document.querySelector(".close-confirm-overlay.paste-confirm")?.remove();
     // Remove all DOM event listeners registered with AbortController
     this.ac.abort();
     // Dispose all xterm event subscriptions
