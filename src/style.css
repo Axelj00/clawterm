@@ -335,6 +335,10 @@ body {
 .tab-close {
   width: 20px;
   height: 20px;
+  /* Expand hit area to ~32px via padding (visual size stays 20px) */
+  padding: 6px;
+  box-sizing: content-box;
+  margin: -6px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.3);
@@ -352,6 +356,12 @@ body {
 
 .tab-entry:hover .tab-close {
   opacity: 1;
+}
+
+.tab-close:focus-visible {
+  opacity: 1;
+  outline: 1px solid var(--sidebar-accent);
+  outline-offset: -1px;
 }
 
 .tab-close:hover {
@@ -486,7 +496,8 @@ body {
 #utility-buttons button {
   width: 24px;
   height: 20px;
-  padding: 0;
+  /* Expand hit area via padding (visual size stays the same) */
+  padding: 6px 4px;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.45);
@@ -503,6 +514,11 @@ body {
 #utility-buttons button:hover {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.6);
+}
+
+#utility-buttons button:focus-visible {
+  outline: 1px solid var(--sidebar-accent);
+  outline-offset: -1px;
 }
 
 #shortcuts-btn.active {
@@ -925,6 +941,12 @@ body {
   width: 200px;
 }
 
+.search-input:focus-visible {
+  outline: 1px solid var(--sidebar-accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
 .search-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }
@@ -1034,6 +1056,10 @@ body {
   font-size: 14px;
   font-family: inherit;
   outline: none;
+}
+
+.tab-switcher-input:focus-visible {
+  border-bottom-color: var(--sidebar-accent);
 }
 
 .tab-switcher-input::placeholder {
@@ -1287,6 +1313,10 @@ body {
   outline: none;
 }
 
+.palette-input:focus-visible {
+  border-bottom-color: var(--sidebar-accent);
+}
+
 .palette-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }
@@ -1415,4 +1445,15 @@ body {
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
