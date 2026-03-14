@@ -12,7 +12,7 @@ A terminal emulator built for running AI coding agents. Vertical tabs, split pan
 
 Clawterm is a lightweight terminal emulator designed for AI-agent workflows. If you spend your day running Claude Code, Codex, or similar tools across multiple sessions, Clawterm gives you a clean vertical-tab interface to manage them all without the overhead of a full IDE terminal.
 
-Built with [Tauri 2](https://v2.tauri.app/) and [xterm.js](https://xtermjs.org/). macOS only (Apple Silicon).
+Built with [Tauri 2](https://v2.tauri.app/) and [xterm.js](https://xtermjs.org/). macOS (Apple Silicon and Intel).
 
 ## Install
 

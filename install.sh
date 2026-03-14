@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Clawterm installer (macOS Apple Silicon only)
+# Clawterm installer (macOS, Apple Silicon and Intel)
 # Usage: curl -fsSL https://raw.githubusercontent.com/clawterm/clawterm/main/install.sh | bash
 
 REPO="clawterm/clawterm"
@@ -15,7 +15,13 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 [ "$OS" != "Darwin" ] && error "Clawterm only supports macOS. Detected OS: $OS"
-[ "$ARCH" != "arm64" ] && error "Clawterm requires Apple Silicon (M-series). Detected arch: $ARCH"
+if [ "$ARCH" = "arm64" ]; then
+  ARCH_SUFFIX="aarch64"
+elif [ "$ARCH" = "x86_64" ]; then
+  ARCH_SUFFIX="x64"
+else
+  error "Unsupported architecture: $ARCH"
+fi
 
 # Fetch latest release tag
 info "Fetching latest release..."
@@ -36,7 +42,7 @@ else
   info "Installing Clawterm ${TAG#v}..."
 fi
 
-ASSET="${APP_NAME}_${TAG#v}_aarch64.dmg"
+ASSET="${APP_NAME}_${TAG#v}_${ARCH_SUFFIX}.dmg"
 URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
 
 TMPDIR_DL="$(mktemp -d)"
