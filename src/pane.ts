@@ -394,7 +394,10 @@ export class Pane {
 
   /** Get process info for polling (used by Tab) */
   getProcessInfo(): { pid: number | null; disposed: boolean } {
-    return { pid: this.ptyPid, disposed: this.disposed };
+    // Read pid from the pty directly — tauri-pty sets it asynchronously
+    // after spawn, so the cached ptyPid from construction time may be undefined.
+    const pid = (this.pty as any)?.pid ?? this.ptyPid ?? null;
+    return { pid, disposed: this.disposed };
   }
 
   toggleSearch() {
