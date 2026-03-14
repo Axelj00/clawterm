@@ -976,24 +976,56 @@ export class Tab {
   /** Restore splits from a serialized tree. Call after start(). */
   async restoreSplits(layout: SessionSplitNode): Promise<void> {
     if (layout.type !== "split") return;
-    // Restore the first level of splits
     await this.restoreNode(layout);
   }
 
   private async restoreNode(node: SessionSplitNode): Promise<void> {
     if (node.type !== "split") return;
 
-    // Split the current focused pane
-    await this.split(node.direction);
+    // Remember the pane that will be split (currently focused)
+    const originalPane = this.focusedPane;
 
-    // The split creates two children — the original pane and a new one.
-    // The new pane gets the second child's CWD.
-    // Adjust ratio
-    if (this.root.type === "split") {
-      this.root.ratio = node.ratio;
-      this.applySplitSizes(this.root);
-      this.fitAllPanes();
+    // Split it — after this, focusedPane = the NEW pane (child[1] side)
+    await this.split(node.direction);
+    const newPane = this.focusedPane;
+
+    // Find the branch containing these two panes and adjust ratio
+    const branch = this.findBranchWith(this.root, originalPane, newPane);
+    if (branch) {
+      branch.ratio = node.ratio;
+      this.applySplitSizes(branch);
     }
+
+    // Recurse into child[1] (new pane, currently focused)
+    if (node.children[1].type === "split") {
+      await this.restoreNode(node.children[1]);
+    }
+
+    // Recurse into child[0] (original pane — need to focus it first)
+    if (node.children[0].type === "split") {
+      this.setFocusedPane(originalPane);
+      await this.restoreNode(node.children[0]);
+    }
+
+    this.fitAllPanes();
+  }
+
+  /** Find the SplitBranch that directly contains both panes as leaves. */
+  private findBranchWith(node: SplitNode, a: Pane, b: Pane): SplitBranch | null {
+    if (node.type === "leaf") return null;
+    const hasA = this.treeContainsPane(node.children[0], a) || this.treeContainsPane(node.children[1], a);
+    const hasB = this.treeContainsPane(node.children[0], b) || this.treeContainsPane(node.children[1], b);
+    if (hasA && hasB) {
+      // Check children first for a tighter match
+      const deeper = this.findBranchWith(node.children[0], a, b) ?? this.findBranchWith(node.children[1], a, b);
+      return deeper ?? node;
+    }
+    return null;
+  }
+
+  private treeContainsPane(node: SplitNode, pane: Pane): boolean {
+    if (node.type === "leaf") return node.pane === pane;
+    return this.treeContainsPane(node.children[0], pane) || this.treeContainsPane(node.children[1], pane);
   }
 
   dispose() {
