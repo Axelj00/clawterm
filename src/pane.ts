@@ -269,7 +269,11 @@ export class Pane {
     this.terminal.registerLinkProvider(new FileLinkProvider(this.terminal));
 
     await new Promise((r) => requestAnimationFrame(r));
-    this.fitAddon.fit();
+    // Guard against zero-dimension elements (e.g. display:none parent) —
+    // fit() on a zero-sized element can produce NaN cols/rows
+    if (this.element.offsetWidth > 0 && this.element.offsetHeight > 0) {
+      this.fitAddon.fit();
+    }
 
     const cols = this.terminal.cols;
     const rows = this.terminal.rows;

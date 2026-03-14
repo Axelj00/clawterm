@@ -230,10 +230,11 @@ export class Tab {
       element: splitContainer,
     };
 
-    // Replace the old leaf in the tree
+    // Replace the old leaf in the tree — swaps the pane's DOM element
+    // with the split container. The pane element is briefly detached.
     this.replaceNode(paneToSplit, newBranch);
 
-    // Build the DOM
+    // Build the DOM — re-add old pane + divider + new pane into the container
     splitContainer.appendChild(paneToSplit.element);
     splitContainer.appendChild(divider);
     splitContainer.appendChild(newPane.element);
@@ -245,7 +246,33 @@ export class Tab {
     this.setupDividerDrag(divider, newBranch);
 
     // Start the new pane's PTY
-    await newPane.start();
+    const ok = await newPane.start();
+
+    if (!ok) {
+      // PTY spawn failed — revert the split
+      logger.warn("Split failed: PTY spawn failed for new pane");
+      this.panes = this.panes.filter((p) => p !== newPane);
+      newPane.dispose();
+
+      // Clean up divider drag listeners
+      const cleanup = this.dividerCleanups.get(newBranch);
+      if (cleanup) {
+        cleanup();
+        this.dividerCleanups.delete(newBranch);
+      }
+
+      // Revert tree: replace the branch with just the original pane
+      this.replaceNode(newBranch, { type: "leaf", pane: paneToSplit });
+      splitContainer.remove();
+
+      // Clear stale inline sizes on the surviving pane
+      paneToSplit.element.style.width = "";
+      paneToSplit.element.style.height = "";
+
+      showToast("Failed to start terminal in split pane", "error");
+      requestAnimationFrame(() => this.fitAllPanes());
+      return;
+    }
 
     // Focus the new pane
     this.focusedPane = newPane;

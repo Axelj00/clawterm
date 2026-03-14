@@ -713,11 +713,16 @@ export class TerminalManager {
     showCommandPalette(commands);
   }
 
-  private splitActiveTab(direction: "horizontal" | "vertical") {
+  private async splitActiveTab(direction: "horizontal" | "vertical") {
     if (!this.activeTabId) return;
     const tab = this.tabs.get(this.activeTabId);
     if (!tab) return;
-    tab.split(direction);
+    try {
+      await tab.split(direction);
+    } catch (e) {
+      logger.warn("Split failed:", e);
+      showToast("Failed to split terminal", "error");
+    }
   }
 
   private closeActivePane() {
@@ -881,14 +886,20 @@ export class TerminalManager {
         separator: true,
         action: () => {
           this.switchToTab(tabId);
-          tab.split("horizontal");
+          tab.split("horizontal").catch((e) => {
+            logger.warn("Split failed:", e);
+            showToast("Failed to split terminal", "error");
+          });
         },
       },
       {
         label: "Split Down",
         action: () => {
           this.switchToTab(tabId);
-          tab.split("vertical");
+          tab.split("vertical").catch((e) => {
+            logger.warn("Split failed:", e);
+            showToast("Failed to split terminal", "error");
+          });
         },
       },
       {
