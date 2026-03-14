@@ -16,11 +16,13 @@ export function showToast(message: string, level: ToastLevel = "info", durationM
 
   const toast = document.createElement("div");
   toast.className = `toast toast-${level}`;
+  toast.setAttribute("role", "alert");
   toast.textContent = message;
 
   const dismiss = document.createElement("button");
   dismiss.className = "toast-dismiss";
   dismiss.textContent = "\u00d7";
+  dismiss.setAttribute("aria-label", "Dismiss notification");
   dismiss.addEventListener("click", () => remove());
   toast.appendChild(dismiss);
 
@@ -30,12 +32,17 @@ export function showToast(message: string, level: ToastLevel = "info", durationM
   requestAnimationFrame(() => toast.classList.add("toast-visible"));
 
   const timer = setTimeout(() => remove(), durationMs);
+  let removed = false;
 
   function remove() {
+    if (removed) return;
+    removed = true;
     clearTimeout(timer);
     toast.classList.remove("toast-visible");
-    toast.addEventListener("transitionend", () => toast.remove());
-    // Fallback if transitionend doesn't fire
-    setTimeout(() => toast.remove(), 300);
+    const fallback = setTimeout(() => toast.remove(), 300);
+    toast.addEventListener("transitionend", () => {
+      clearTimeout(fallback);
+      toast.remove();
+    }, { once: true });
   }
 }
