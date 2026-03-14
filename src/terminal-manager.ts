@@ -227,11 +227,7 @@ export class TerminalManager {
           "div",
           { id: "sidebar" },
           el("div", { id: "tab-list", role: "tablist", "aria-label": "Terminal tabs" }),
-          el(
-            "div",
-            { id: "sidebar-footer" },
-            el("button", { id: "new-tab-btn" }, "+ New Tab"),
-          ),
+          el("div", { id: "sidebar-footer" }, el("button", { id: "new-tab-btn" }, "+ New Tab")),
         ),
         el("div", { id: "sidebar-divider" }),
         el(
@@ -477,10 +473,13 @@ export class TerminalManager {
 
     // Immediately poll process info so the tab title updates ASAP
     // (don't wait for the next interval tick)
-    tab.pollProcessInfo().then(() => {
-      this.renderTabList();
-      this.updateStatusBar();
-    }).catch(() => {});
+    tab
+      .pollProcessInfo()
+      .then(() => {
+        this.renderTabList();
+        this.updateStatusBar();
+      })
+      .catch(() => {});
 
     // Send startup command after a brief delay for shell init
     if (startupCommand) {
@@ -1145,7 +1144,9 @@ export class TerminalManager {
       // Snapshot active tab ID to avoid race if user switches mid-loop
       const activeId = this.activeTabId;
 
-      logger.debug(`[centralPoll] cycle=${pollCycleCount} tabs=${this.tabs.size} bg=${pollBackground} active=${activeId}`);
+      logger.debug(
+        `[centralPoll] cycle=${pollCycleCount} tabs=${this.tabs.size} bg=${pollBackground} active=${activeId}`,
+      );
 
       // Poll tabs concurrently so one stuck IPC call can't block everything
       const polls: Promise<void>[] = [];

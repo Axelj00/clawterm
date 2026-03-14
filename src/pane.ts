@@ -271,7 +271,9 @@ export class Pane {
     // Wire output analyzer events
     if (config.outputAnalysis?.enabled !== false) {
       this.analyzer.onEvent((event) => {
-        logger.debug(`[pane.analyzerEvent] pane=${this.id} type=${event.type} detail=${event.detail.slice(0, 60)}`);
+        logger.debug(
+          `[pane.analyzerEvent] pane=${this.id} type=${event.type} detail=${event.detail.slice(0, 60)}`,
+        );
         this.onOutputEvent?.(event);
       });
     }
@@ -288,7 +290,11 @@ export class Pane {
         const webgl = new WebglAddon();
         webgl.onContextLoss(() => {
           logger.debug(`[pane.webgl] pane=${this.id} context lost, falling back to canvas`);
-          try { webgl.dispose(); } catch { /* already disposed */ }
+          try {
+            webgl.dispose();
+          } catch {
+            /* already disposed */
+          }
         });
         this.terminal.loadAddon(webgl);
         this.disposables.push(webgl);
@@ -345,14 +351,17 @@ export class Pane {
     const ptyObj = this.pty as any;
     const ptyInit = ptyObj._init as Promise<void> | undefined;
     if (ptyInit) {
-      ptyInit.then(() => {
-        this.ptyHandle = ptyObj.pid as number;
-        logger.debug(`[pane.start] pane=${this.id} ptyHandle=${this.ptyHandle}`);
-        return invoke<number>("plugin:pty|child_pid", { pid: this.ptyHandle });
-      }).then((osPid) => {
-        this.ptyPid = osPid;
-        logger.debug(`[pane.start] pane=${this.id} osPid=${osPid}`);
-      }).catch((e) => logger.warn("Failed to get shell PID:", e));
+      ptyInit
+        .then(() => {
+          this.ptyHandle = ptyObj.pid as number;
+          logger.debug(`[pane.start] pane=${this.id} ptyHandle=${this.ptyHandle}`);
+          return invoke<number>("plugin:pty|child_pid", { pid: this.ptyHandle });
+        })
+        .then((osPid) => {
+          this.ptyPid = osPid;
+          logger.debug(`[pane.start] pane=${this.id} osPid=${osPid}`);
+        })
+        .catch((e) => logger.warn("Failed to get shell PID:", e));
     }
 
     this.pty.onData((data: Uint8Array | number[]) => {

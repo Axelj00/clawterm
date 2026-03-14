@@ -1,10 +1,6 @@
 import type { OutputEvent } from "./matchers";
 import { logger } from "./logger";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
 interface NotificationTypeConfig {
   enabled: boolean;

@@ -293,7 +293,10 @@ export class TabRenderer {
       // Include per-pane status in snapshot for change detection
       const paneSnap = tab
         .getPaneStates()
-        .map((ps) => `${ps.activity}:${ps.agentName}:${ps.serverPort}:${ps.processName}:${ps.folderName}:${ps.lastError}:${ps.agentStartedAt ? Math.floor((Date.now() - ps.agentStartedAt) / 1000) : ""}`)
+        .map(
+          (ps) =>
+            `${ps.activity}:${ps.agentName}:${ps.serverPort}:${ps.processName}:${ps.folderName}:${ps.lastError}:${ps.agentStartedAt ? Math.floor((Date.now() - ps.agentStartedAt) / 1000) : ""}`,
+        )
         .join(",");
       parts.push(
         `${id}|${tab.title}|${subtitle}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}|${s.gitBranch}|${s.folderName}|${paneSnap}`,

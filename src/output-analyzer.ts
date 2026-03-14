@@ -81,7 +81,10 @@ export class OutputAnalyzer {
         let contextLines: string[] | undefined;
         if (matcher.type === "agent-waiting") {
           const lines = this.buffer.split("\n");
-          contextLines = lines.slice(-5).map((l) => l.trim()).filter(Boolean);
+          contextLines = lines
+            .slice(-5)
+            .map((l) => l.trim())
+            .filter(Boolean);
         }
 
         const event: OutputEvent = {

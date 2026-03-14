@@ -186,7 +186,6 @@ body {
   color: rgba(255, 255, 255, 0.5);
 }
 
-
 .tab-pane-dot {
   width: 6px;
   height: 6px;
@@ -682,9 +681,15 @@ body {
 }
 
 @keyframes pane-number-fade {
-  0% { opacity: 1; }
-  60% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* Split containers */
@@ -818,7 +823,9 @@ body {
   pointer-events: auto;
   cursor: pointer;
   opacity: 0.8;
-  transition: opacity 0.1s, transform 0.1s;
+  transition:
+    opacity 0.1s,
+    transform 0.1s;
 }
 
 .event-marker:hover {

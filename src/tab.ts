@@ -1,7 +1,13 @@
 import type { Config } from "./config";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout } from "./utils";
-import { type TabState, type PaneState, createDefaultTabState, computeFolderTitle, type TabActivity } from "./tab-state";
+import {
+  type TabState,
+  type PaneState,
+  createDefaultTabState,
+  computeFolderTitle,
+  type TabActivity,
+} from "./tab-state";
 import { type OutputEvent, AGENT_PROCESS_MAP } from "./matchers";
 import type { SessionSplitNode } from "./session";
 import { logger } from "./logger";
@@ -121,10 +127,12 @@ export class Tab {
     pane.onTerminalTitle = () => {
       if (titlePollTimer) clearTimeout(titlePollTimer);
       titlePollTimer = setTimeout(() => {
-        this.pollPane(pane).then(() => {
-          this.deriveTabState();
-          this.updateTitle();
-        }).catch(() => {});
+        this.pollPane(pane)
+          .then(() => {
+            this.deriveTabState();
+            this.updateTitle();
+          })
+          .catch(() => {});
       }, 100); // 100ms debounce
     };
 
@@ -133,7 +141,9 @@ export class Tab {
   }
 
   private handleOutputEvent(event: OutputEvent, sourcePane?: Pane) {
-    logger.debug(`[handleOutputEvent] tab=${this.id} type=${event.type} agent=${event.agentName ?? "none"} pane=${sourcePane?.id ?? "unknown"}`);
+    logger.debug(
+      `[handleOutputEvent] tab=${this.id} type=${event.type} agent=${event.agentName ?? "none"} pane=${sourcePane?.id ?? "unknown"}`,
+    );
 
     // Update per-pane state
     const ps = sourcePane?.state;
@@ -166,7 +176,9 @@ export class Tab {
           }, this.config.advanced.completedFadeMs);
           break;
       }
-      logger.debug(`[handleOutputEvent] pane=${sourcePane?.id} paneState activity=${ps.activity} agent=${ps.agentName}`);
+      logger.debug(
+        `[handleOutputEvent] pane=${sourcePane?.id} paneState activity=${ps.activity} agent=${ps.agentName}`,
+      );
     }
 
     // Update tab-level state
@@ -461,10 +473,7 @@ export class Tab {
   }
 
   /** Find the parent branch of a pane and which child index it's in */
-  private findPaneBranch(
-    node: SplitNode,
-    pane: Pane,
-  ): { branch: SplitBranch; childIndex: number } | null {
+  private findPaneBranch(node: SplitNode, pane: Pane): { branch: SplitBranch; childIndex: number } | null {
     if (node.type !== "split") return null;
     for (let i = 0; i < 2; i++) {
       const child = node.children[i];
@@ -694,20 +703,24 @@ export class Tab {
     try {
       // Use tcgetpgrp via pty plugin to get the foreground process group leader.
       // This is more reliable than proc_listchildpids for PTY-spawned shells.
-      const fgPgid = pane.ptyHandle != null
-        ? await invoke<number>("plugin:pty|foreground_pid", { pid: pane.ptyHandle }).catch(() => shellPid)
-        : shellPid;
+      const fgPgid =
+        pane.ptyHandle != null
+          ? await invoke<number>("plugin:pty|foreground_pid", { pid: pane.ptyHandle }).catch(() => shellPid)
+          : shellPid;
 
-      logger.debug(`[pollPane] pane=${pane.id} shellPid=${shellPid} fgPgid=${fgPgid} ptyHandle=${pane.ptyHandle}`);
+      logger.debug(
+        `[pollPane] pane=${pane.id} shellPid=${shellPid} fgPgid=${fgPgid} ptyHandle=${pane.ptyHandle}`,
+      );
 
       // Now get the deepest child of the foreground group leader
-      const procInfo = fgPgid !== shellPid
-        ? await invokeWithTimeout<{ name: string; pid: number }>(
-            "get_foreground_process",
-            { pid: fgPgid },
-            timeout,
-          )
-        : { name: "zsh", pid: shellPid };
+      const procInfo =
+        fgPgid !== shellPid
+          ? await invokeWithTimeout<{ name: string; pid: number }>(
+              "get_foreground_process",
+              { pid: fgPgid },
+              timeout,
+            )
+          : { name: "zsh", pid: shellPid };
 
       logger.debug(`[pollPane] pane=${pane.id} procInfo name=${procInfo.name} pid=${procInfo.pid}`);
 
@@ -734,7 +747,9 @@ export class Tab {
       if (!newIsIdle) {
         pane.lastRunningAt = Date.now();
         const agentId = AGENT_PROCESS_MAP[procInfo.name.toLowerCase()];
-        logger.debug(`[pollPane] pane=${pane.id} agentDetect name=${procInfo.name} agentId=${agentId ?? "none"}`);
+        logger.debug(
+          `[pollPane] pane=${pane.id} agentDetect name=${procInfo.name} agentId=${agentId ?? "none"}`,
+        );
         if (agentId) {
           if (ps.agentName !== agentId) {
             ps.agentStartedAt = Date.now();
@@ -814,7 +829,14 @@ export class Tab {
     this.state.isIdle = fps.isIdle;
 
     // Tab activity = highest priority across all panes
-    const ACTIVITY_PRIORITY: TabActivity[] = ["error", "agent-waiting", "running", "server-running", "completed", "idle"];
+    const ACTIVITY_PRIORITY: TabActivity[] = [
+      "error",
+      "agent-waiting",
+      "running",
+      "server-running",
+      "completed",
+      "idle",
+    ];
     let bestActivity: TabActivity = "idle";
     let bestAgent: string | null = null;
     let bestAgentStartedAt: number | null = null;
@@ -840,7 +862,9 @@ export class Tab {
     this.state.serverPort = bestServerPort;
     this.state.lastError = bestError;
 
-    logger.debug(`[deriveTabState] tab=${this.id} activity=${bestActivity} agent=${bestAgent} folder=${this.state.folderName}`);
+    logger.debug(
+      `[deriveTabState] tab=${this.id} activity=${bestActivity} agent=${bestAgent} folder=${this.state.folderName}`,
+    );
   }
 
   toggleSearch() {
@@ -1017,7 +1041,8 @@ export class Tab {
     const hasB = this.treeContainsPane(node.children[0], b) || this.treeContainsPane(node.children[1], b);
     if (hasA && hasB) {
       // Check children first for a tighter match
-      const deeper = this.findBranchWith(node.children[0], a, b) ?? this.findBranchWith(node.children[1], a, b);
+      const deeper =
+        this.findBranchWith(node.children[0], a, b) ?? this.findBranchWith(node.children[1], a, b);
       return deeper ?? node;
     }
     return null;
