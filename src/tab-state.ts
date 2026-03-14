@@ -76,7 +76,7 @@ export function computeDisplayTitle(state: TabState): string {
 }
 
 function formatElapsed(startMs: number): string {
-  const secs = Math.floor((Date.now() - startMs) / 1000);
+  const secs = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}m`;

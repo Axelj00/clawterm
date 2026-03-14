@@ -631,6 +631,8 @@ export class Tab {
     const onMove = (e: MouseEvent) => {
       if (!dragging) return;
       const rect = branch.element.getBoundingClientRect();
+      // Guard against zero-dimension containers (window minimized, etc.)
+      if (rect.width === 0 || rect.height === 0) return;
       let ratio: number;
       if (branch.direction === "horizontal") {
         ratio = (e.clientX - rect.left) / rect.width;
@@ -732,11 +734,14 @@ export class Tab {
 
       logger.debug(`[pollPane] pane=${pane.id} idle=${newIsIdle} wasIdle=${wasIdle}`);
 
-      // Always look up shell CWD — it's cheap and the user may have cd'd
-      const [folder, fullCwd] = await Promise.all([
+      // Always look up shell CWD — it's cheap and the user may have cd'd.
+      // Use allSettled so one failure doesn't kill the entire poll cycle.
+      const cwdResults = await Promise.allSettled([
         invokeWithTimeout<string>("get_process_cwd", { pid: shellPid }, timeout),
         invokeWithTimeout<string>("get_process_cwd_full", { pid: shellPid }, timeout),
       ]);
+      const folder = cwdResults[0].status === "fulfilled" ? cwdResults[0].value : ps.folderName;
+      const fullCwd = cwdResults[1].status === "fulfilled" ? cwdResults[1].value : null;
 
       ps.folderName = folder;
       ps.processName = newIsIdle ? "" : procInfo.name;

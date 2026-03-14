@@ -83,8 +83,8 @@ export class Pane {
           type: um.type,
           cooldownMs: um.cooldownMs ?? 5000,
         });
-      } catch {
-        // Invalid regex — skip silently
+      } catch (e) {
+        logger.warn(`Invalid regex in custom matcher "${um.id}": ${e instanceof Error ? e.message : e}`);
       }
     }
 
@@ -321,8 +321,9 @@ export class Pane {
       this.fitAddon.fit();
     }
 
-    const cols = this.terminal.cols;
-    const rows = this.terminal.rows;
+    // Ensure valid dimensions — xterm.js may produce 0 or NaN on hidden elements
+    const cols = this.terminal.cols > 0 && Number.isFinite(this.terminal.cols) ? this.terminal.cols : 80;
+    const rows = this.terminal.rows > 0 && Number.isFinite(this.terminal.rows) ? this.terminal.rows : 24;
 
     const spawnOpts: Record<string, unknown> = {
       cols,
@@ -353,11 +354,13 @@ export class Pane {
     if (ptyInit) {
       ptyInit
         .then(() => {
+          if (this.disposed) return;
           this.ptyHandle = ptyObj.pid as number;
           logger.debug(`[pane.start] pane=${this.id} ptyHandle=${this.ptyHandle}`);
           return invoke<number>("plugin:pty|child_pid", { pid: this.ptyHandle });
         })
         .then((osPid) => {
+          if (this.disposed || osPid == null) return;
           this.ptyPid = osPid;
           logger.debug(`[pane.start] pane=${this.id} osPid=${osPid}`);
         })
@@ -477,6 +480,12 @@ export class Pane {
   }
 
   private showPasteConfirm(text: string) {
+    // Reject extremely large pastes to avoid freezing the UI
+    if (text.length > 5_000_000) {
+      showToast("Paste too large (>5MB)", "error");
+      return;
+    }
+
     // Remove any existing paste confirm dialog
     document.querySelector(".close-confirm-overlay.paste-confirm")?.remove();
 
@@ -585,7 +594,7 @@ export class Pane {
       return;
     }
 
-    const totalLines = this.analyzer.totalLines || 1;
+    const totalLines = this.analyzer.totalLines > 0 ? this.analyzer.totalLines : 1;
     const gutterHeight = this.eventGutter.clientHeight;
     if (gutterHeight === 0) return;
 

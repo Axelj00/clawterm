@@ -370,6 +370,20 @@ export function validateConfig(config: Config): Config {
       result.advanced = { ...result.advanced, [field]: DEFAULT_CONFIG.advanced[field] };
     }
   };
+  // Ensure nested theme objects exist before accessing fields
+  if (!result.theme || typeof result.theme !== "object") {
+    result.theme = { ...DEFAULT_CONFIG.theme };
+  }
+  if (!result.theme.sidebar || typeof result.theme.sidebar !== "object") {
+    result.theme.sidebar = { ...DEFAULT_CONFIG.theme.sidebar };
+  }
+  if (!result.theme.terminal || typeof result.theme.terminal !== "object") {
+    result.theme.terminal = { ...DEFAULT_CONFIG.theme.terminal };
+  }
+  if (!result.theme.ui || typeof result.theme.ui !== "object") {
+    result.theme.ui = { ...DEFAULT_CONFIG.theme.ui };
+  }
+
   // UI theme numeric fields
   const ui = result.theme.ui;
   if (typeof ui.titlebarHeight !== "number" || ui.titlebarHeight < 28 || ui.titlebarHeight > 60) {
@@ -411,7 +425,7 @@ export function validateConfig(config: Config): Config {
   clampNum("backgroundPollIntervalMs", 1000, 60000);
   clampNum("healthCheckIntervalMs", 2000, 120000);
   clampNum("completedFadeMs", 1000, 30000);
-  clampNum("ipcTimeoutMs", 1000, 30000);
+  clampNum("ipcTimeoutMs", 2000, 30000);
 
   return result;
 }
