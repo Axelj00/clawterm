@@ -430,8 +430,13 @@ body {
 #sidebar-footer {
   padding: 8px;
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   align-items: center;
+}
+
+#sidebar-footer .update-notice {
+  flex-basis: 100%;
 }
 
 #new-tab-btn {

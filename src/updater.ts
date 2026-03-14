@@ -102,21 +102,34 @@ function showUpdateNotice(version: string, onInstall: () => void): void {
 
   const notice = document.createElement("div");
   notice.className = "update-notice";
-  notice.innerHTML = `
-    <div class="update-notice-dot"></div>
-    <div class="update-notice-text">
-      <span class="update-notice-label">Update available</span>
-      <span class="update-notice-version">${version}</span>
-    </div>
-    <button class="update-notice-action">Update</button>
-  `;
+
+  const dot = document.createElement("div");
+  dot.className = "update-notice-dot";
+
+  const text = document.createElement("div");
+  text.className = "update-notice-text";
+  const label = document.createElement("span");
+  label.className = "update-notice-label";
+  label.textContent = "Update available";
+  const ver = document.createElement("span");
+  ver.className = "update-notice-version";
+  ver.textContent = version;
+  text.appendChild(label);
+  text.appendChild(ver);
+
+  const btn = document.createElement("button");
+  btn.className = "update-notice-action";
+  btn.textContent = "Update";
+
+  notice.appendChild(dot);
+  notice.appendChild(text);
+  notice.appendChild(btn);
 
   footer.insertBefore(notice, footer.firstChild);
 
-  notice.querySelector(".update-notice-action")!.addEventListener("click", (e) => {
+  btn.addEventListener("click", (e) => {
     e.stopPropagation();
     showUpdateConfirm(version, () => {
-      const btn = notice.querySelector(".update-notice-action") as HTMLButtonElement;
       btn.textContent = "Installing\u2026";
       btn.disabled = true;
       notice.classList.add("installing");
