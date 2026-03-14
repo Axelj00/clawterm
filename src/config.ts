@@ -36,6 +36,21 @@ export interface UserMatcher {
   cooldownMs?: number;
 }
 
+export interface UITheme {
+  windowBorderRadius: string;
+  windowBorderColor: string;
+  titlebarHeight: number;
+  statusBarHeight: number;
+  panePadding: string;
+  paneFocusOutline: string;
+  paneUnfocusedOpacity: number;
+  splitDividerWidth: number;
+  colorOrange: string;
+  colorRed: string;
+  colorGreen: string;
+  transitionSpeed: string;
+}
+
 export interface Config {
   shell: string;
   shellArgs: string[];
@@ -65,6 +80,7 @@ export interface Config {
       accentColor: string;
     };
     terminal: TerminalTheme;
+    ui: UITheme;
   };
   keybindings: {
     newTab: string;
@@ -168,6 +184,20 @@ const DEFAULT_CONFIG: Config = {
       brightMagenta: "#ff87ff",
       brightCyan: "#55ffff",
       brightWhite: "#ffffff",
+    },
+    ui: {
+      windowBorderRadius: "10px",
+      windowBorderColor: "rgba(255, 255, 255, 0.12)",
+      titlebarHeight: 38,
+      statusBarHeight: 24,
+      panePadding: "4px 2px 2px 6px",
+      paneFocusOutline: "rgba(10, 132, 255, 0.6)",
+      paneUnfocusedOpacity: 0.7,
+      splitDividerWidth: 1,
+      colorOrange: "#ff9f0a",
+      colorRed: "#ff453a",
+      colorGreen: "#30d158",
+      transitionSpeed: "0.12s",
     },
   },
   keybindings: {
@@ -340,6 +370,38 @@ export function validateConfig(config: Config): Config {
       result.advanced = { ...result.advanced, [field]: DEFAULT_CONFIG.advanced[field] };
     }
   };
+  // UI theme numeric fields
+  const ui = result.theme.ui;
+  if (typeof ui.titlebarHeight !== "number" || ui.titlebarHeight < 28 || ui.titlebarHeight > 60) {
+    warn("theme.ui.titlebarHeight", "must be 28–60");
+    result.theme = { ...result.theme, ui: { ...ui, titlebarHeight: DEFAULT_CONFIG.theme.ui.titlebarHeight } };
+  }
+  if (typeof ui.statusBarHeight !== "number" || ui.statusBarHeight < 16 || ui.statusBarHeight > 48) {
+    warn("theme.ui.statusBarHeight", "must be 16–48");
+    result.theme = {
+      ...result.theme,
+      ui: { ...ui, statusBarHeight: DEFAULT_CONFIG.theme.ui.statusBarHeight },
+    };
+  }
+  if (
+    typeof ui.paneUnfocusedOpacity !== "number" ||
+    ui.paneUnfocusedOpacity < 0.3 ||
+    ui.paneUnfocusedOpacity > 1
+  ) {
+    warn("theme.ui.paneUnfocusedOpacity", "must be 0.3–1");
+    result.theme = {
+      ...result.theme,
+      ui: { ...ui, paneUnfocusedOpacity: DEFAULT_CONFIG.theme.ui.paneUnfocusedOpacity },
+    };
+  }
+  if (typeof ui.splitDividerWidth !== "number" || ui.splitDividerWidth < 1 || ui.splitDividerWidth > 8) {
+    warn("theme.ui.splitDividerWidth", "must be 1–8");
+    result.theme = {
+      ...result.theme,
+      ui: { ...ui, splitDividerWidth: DEFAULT_CONFIG.theme.ui.splitDividerWidth },
+    };
+  }
+
   // Clamp maxPanes to avoid WebGL context exhaustion
   if (typeof result.maxPanes !== "number" || result.maxPanes < 1 || result.maxPanes > 4) {
     result.maxPanes = DEFAULT_CONFIG.maxPanes;
@@ -423,4 +485,19 @@ export function applyThemeToCSS(config: Config) {
   root.style.setProperty("--sidebar-accent", s.accentColor);
   root.style.setProperty("--sidebar-width", `${config.sidebar.width}px`);
   root.style.setProperty("--terminal-bg", config.theme.terminal.background);
+
+  // UI theme
+  const u = config.theme.ui;
+  root.style.setProperty("--window-border-radius", u.windowBorderRadius);
+  root.style.setProperty("--window-border-color", u.windowBorderColor);
+  root.style.setProperty("--titlebar-height", `${u.titlebarHeight}px`);
+  root.style.setProperty("--status-bar-height", `${u.statusBarHeight}px`);
+  root.style.setProperty("--pane-padding", u.panePadding);
+  root.style.setProperty("--pane-focus-outline", u.paneFocusOutline);
+  root.style.setProperty("--pane-unfocused-opacity", String(u.paneUnfocusedOpacity));
+  root.style.setProperty("--split-divider-width", `${u.splitDividerWidth}px`);
+  root.style.setProperty("--color-orange", u.colorOrange);
+  root.style.setProperty("--color-red", u.colorRed);
+  root.style.setProperty("--color-green", u.colorGreen);
+  root.style.setProperty("--transition-speed", u.transitionSpeed);
 }

@@ -11,7 +11,15 @@
   --color-orange: #ff9f0a;
   --color-red: #ff453a;
   --color-green: #30d158;
+  --window-border-radius: 10px;
+  --window-border-color: rgba(255, 255, 255, 0.12);
+  --titlebar-height: 38px;
   --status-bar-height: 24px;
+  --pane-padding: 4px 2px 2px 6px;
+  --pane-focus-outline: rgba(10, 132, 255, 0.6);
+  --pane-unfocused-opacity: 0.7;
+  --split-divider-width: 1px;
+  --transition-speed: 0.12s;
 }
 
 * {
@@ -36,8 +44,8 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--sidebar-bg);
-  border-radius: 10px;
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--window-border-radius);
+  border: 0.5px solid var(--window-border-color);
   overflow: hidden;
 }
 
@@ -47,8 +55,8 @@ body {
 
 /* Top drag bar - spans full width for window dragging */
 #titlebar {
-  height: 38px;
-  min-height: 38px;
+  height: var(--titlebar-height);
+  min-height: var(--titlebar-height);
   width: 100%;
   background: var(--sidebar-bg);
   position: relative;
@@ -56,7 +64,7 @@ body {
   display: flex;
   align-items: center;
   padding-left: 12px;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--window-border-radius) var(--window-border-radius) 0 0;
   cursor: default;
 }
 
@@ -71,7 +79,7 @@ body {
   border-radius: 50%;
   border: none;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-speed);
   opacity: 0.8;
 }
 
@@ -110,17 +118,17 @@ body {
   user-select: none;
   -webkit-user-select: none;
   -webkit-app-region: no-drag;
-  border-radius: 0 0 0 10px;
+  border-radius: 0 0 0 var(--window-border-radius);
 }
 
 #app.sidebar-right #sidebar {
   border-right: none;
   border-left: 1px solid var(--sidebar-border);
-  border-radius: 0 0 10px 0;
+  border-radius: 0 0 var(--window-border-radius) 0;
 }
 
 #app.sidebar-right #status-bar {
-  border-radius: 0 0 0 10px;
+  border-radius: 0 0 0 var(--window-border-radius);
 }
 
 #tab-list {
@@ -148,7 +156,7 @@ body {
   font-size: 13px;
   font-weight: 400;
   border-radius: 6px;
-  transition: all 0.12s ease;
+  transition: all var(--transition-speed) ease;
   margin-bottom: 2px;
   position: relative;
 }
@@ -350,7 +358,7 @@ body {
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: all 0.12s ease;
+  transition: all var(--transition-speed) ease;
   -webkit-app-region: no-drag;
   flex-shrink: 0;
 }
@@ -467,7 +475,7 @@ body {
   font-size: 13px;
   cursor: pointer;
   border-radius: 6px;
-  transition: all 0.12s ease;
+  transition: all var(--transition-speed) ease;
   -webkit-app-region: no-drag;
 }
 
@@ -498,7 +506,7 @@ body {
   font-size: 13px;
   cursor: pointer;
   border-radius: 4px;
-  transition: all 0.12s ease;
+  transition: all var(--transition-speed) ease;
   -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
@@ -619,7 +627,7 @@ body {
   right: 0;
   bottom: 0;
   display: none;
-  padding: 4px 2px 2px 6px;
+  padding: var(--pane-padding);
 }
 
 .terminal-wrapper.active {
@@ -646,14 +654,14 @@ body {
 
 /* Focused pane indicator — visible border */
 .pane-focused {
-  outline: 1px solid rgba(10, 132, 255, 0.6);
+  outline: 1px solid var(--pane-focus-outline);
   outline-offset: -1px;
 }
 
 /* Dim unfocused panes when multiple panes exist */
 .split-container .pane:not(.pane-focused) {
-  opacity: 0.7;
-  transition: opacity 0.15s;
+  opacity: var(--pane-unfocused-opacity);
+  transition: opacity var(--transition-speed);
 }
 
 .split-container .pane:not(.pane-focused):hover {
@@ -668,7 +676,7 @@ body {
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  background: rgba(10, 132, 255, 0.8);
+  background: var(--sidebar-accent);
   color: white;
   font-size: 11px;
   font-weight: 600;
@@ -724,7 +732,7 @@ body {
 }
 
 .split-divider-horizontal {
-  width: 1px;
+  width: var(--split-divider-width);
   cursor: col-resize;
 }
 
@@ -738,7 +746,7 @@ body {
 }
 
 .split-divider-vertical {
-  height: 1px;
+  height: var(--split-divider-width);
   cursor: row-resize;
 }
 
@@ -763,7 +771,7 @@ body {
   gap: 16px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.35);
-  border-radius: 0 0 10px 0;
+  border-radius: 0 0 var(--window-border-radius) 0;
 }
 
 #status-bar span:empty {
@@ -933,7 +941,7 @@ body {
   font-size: 12px;
   padding: 2px 4px;
   border-radius: 3px;
-  transition: all 0.12s;
+  transition: all var(--transition-speed);
 }
 
 .search-btn:hover {
@@ -1149,7 +1157,7 @@ body {
   cursor: pointer;
   font-family: inherit;
   flex-shrink: 0;
-  transition: opacity 0.12s;
+  transition: opacity var(--transition-speed);
 }
 
 .update-notice-action:hover {
@@ -1365,7 +1373,7 @@ body {
   font-family: inherit;
   cursor: pointer;
   border: none;
-  transition: opacity 0.12s;
+  transition: opacity var(--transition-speed);
 }
 
 .close-confirm-btn.cancel {

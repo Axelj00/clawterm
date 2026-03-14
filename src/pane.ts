@@ -517,7 +517,7 @@ export class Pane {
     const pasteBtn = document.createElement("button");
     pasteBtn.className = "close-confirm-btn confirm";
     pasteBtn.textContent = "Paste";
-    pasteBtn.style.background = "#0a84ff";
+    pasteBtn.style.background = "var(--sidebar-accent)";
 
     actionsEl.appendChild(cancelBtn);
     actionsEl.appendChild(singleLineBtn);
