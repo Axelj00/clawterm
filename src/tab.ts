@@ -56,8 +56,8 @@ export class Tab {
   private focusedPane: Pane;
   /** All panes in this tab (flat list for easy iteration) */
   private panes: Pane[] = [];
-  /** Cleanup functions for document-level drag listeners, keyed by branch */
-  private dividerCleanups = new Map<SplitBranch, () => void>();
+  /** AbortControllers for document-level drag listeners, keyed by branch */
+  private dividerCleanups = new Map<SplitBranch, AbortController>();
   /** Pending rAF ID from show() — cancelled on hide() to prevent stale focus */
   private showRafId: number | null = null;
 
@@ -319,9 +319,9 @@ export class Tab {
       newPane.dispose();
 
       // Clean up divider drag listeners
-      const cleanup = this.dividerCleanups.get(newBranch);
-      if (cleanup) {
-        cleanup();
+      const ac = this.dividerCleanups.get(newBranch);
+      if (ac) {
+        ac.abort();
         this.dividerCleanups.delete(newBranch);
       }
 
@@ -391,9 +391,9 @@ export class Tab {
 
     // Clean up the split container element and its document-level drag listeners
     parent.element.remove();
-    const cleanup = this.dividerCleanups.get(parent);
-    if (cleanup) {
-      cleanup();
+    const ac = this.dividerCleanups.get(parent);
+    if (ac) {
+      ac.abort();
       this.dividerCleanups.delete(parent);
     }
 
@@ -667,14 +667,15 @@ export class Tab {
       this.fitAllPanes();
     };
 
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+    // Use an AbortController so all document-level listeners are cleaned up
+    // atomically — even if manual cleanup is missed, aborting the signal
+    // guarantees removal.
+    const ac = new AbortController();
+    document.addEventListener("mousemove", onMove, { signal: ac.signal });
+    document.addEventListener("mouseup", onUp, { signal: ac.signal });
 
     // Track for cleanup — keyed by branch so we can remove on pane close
-    this.dividerCleanups.set(branch, () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    });
+    this.dividerCleanups.set(branch, ac);
   }
 
   private fitAllPanes() {
@@ -1107,8 +1108,8 @@ export class Tab {
 
   dispose() {
     // Clean up document-level divider drag listeners
-    for (const cleanup of this.dividerCleanups.values()) {
-      cleanup();
+    for (const ac of this.dividerCleanups.values()) {
+      ac.abort();
     }
     this.dividerCleanups.clear();
 
