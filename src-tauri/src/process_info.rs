@@ -164,9 +164,24 @@ mod platform {
 
     const PROC_PIDVNODEPATHINFO: libc::c_int = 9;
 
+    /// Known agent process names — if we see one during the tree walk,
+    /// remember it so we can report it even if the deepest child is a
+    /// subshell or helper process spawned by the agent.
+    fn is_known_agent(name: &str) -> bool {
+        matches!(
+            name,
+            "claude" | "claude-code" | "aider" | "copilot" | "cursor"
+                | "codex" | "gemini"
+        )
+    }
+
     pub fn get_foreground_process(pid: u32) -> Result<ProcessInfo, String> {
         let mut current_pid = pid;
         let mut current_name = get_proc_name(pid).unwrap_or_default();
+
+        // Track the last known agent we passed through during the walk
+        let mut agent_pid: Option<u32> = None;
+        let mut agent_name: Option<String> = None;
 
         loop {
             let children = list_child_pids(current_pid);
@@ -178,6 +193,12 @@ mod platform {
             let child_pid = children[children.len() - 1];
             current_name = get_proc_name(child_pid).unwrap_or_default();
             current_pid = child_pid;
+
+            // Remember if this is a known agent
+            if is_known_agent(&current_name) {
+                agent_pid = Some(current_pid);
+                agent_name = Some(current_name.clone());
+            }
         }
 
         // If the process name is a runtime (node, python, etc.), check
@@ -185,6 +206,15 @@ mod platform {
         if matches!(current_name.as_str(), "node" | "python" | "python3" | "ruby") {
             if let Some(friendly) = friendly_name_from_args(current_pid) {
                 current_name = friendly;
+            }
+        }
+
+        // If the deepest child is a shell/generic process but we passed through
+        // a known agent, report the agent instead. This handles agents that spawn
+        // subshells for tool execution (e.g. claude → zsh → command).
+        if !is_known_agent(&current_name) {
+            if let (Some(ap), Some(an)) = (agent_pid, agent_name) {
+                return Ok(ProcessInfo { name: an, pid: ap });
             }
         }
 
@@ -264,7 +294,7 @@ mod platform {
                 .trim_end_matches(".cjs")
                 .trim_end_matches(".py")
                 .trim_end_matches(".rb");
-            if matches!(name, "claude" | "claude-code" | "aider" | "copilot" | "cursor") {
+            if matches!(name, "claude" | "claude-code" | "aider" | "copilot" | "cursor" | "codex" | "gemini") {
                 return Some(name.to_string());
             }
             // First non-flag arg checked; stop to avoid false positives

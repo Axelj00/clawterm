@@ -25,6 +25,8 @@ export const AGENT_PROCESS_MAP: Record<string, string> = {
   aider: "aider",
   copilot: "copilot",
   cursor: "cursor",
+  codex: "codex",
+  gemini: "gemini",
 };
 
 // Agent-specific accent colors for sidebar indicators
@@ -33,6 +35,8 @@ export const AGENT_COLORS: Record<string, string> = {
   aider: "#30d158",
   copilot: "#bf5af2",
   cursor: "#0a84ff",
+  codex: "#10a37f",
+  gemini: "#4285f4",
 };
 
 function extractValidPort(m: RegExpMatchArray, group = 1): Partial<OutputEvent> {
