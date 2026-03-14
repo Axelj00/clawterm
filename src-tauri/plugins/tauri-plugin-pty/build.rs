@@ -1,4 +1,4 @@
-const COMMANDS: &[&str] = &["spawn", "write", "read", "resize", "kill", "exitstatus", "child_pid", "foreground_pid"];
+const COMMANDS: &[&str] = &["spawn", "write", "read", "resize", "kill", "exitstatus", "child_pid", "foreground_pid", "clear_sessions"];
 
 fn main() {
     tauri_plugin::Builder::new(COMMANDS)

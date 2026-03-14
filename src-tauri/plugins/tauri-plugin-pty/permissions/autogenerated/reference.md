@@ -36,6 +36,32 @@ Denies the child_pid command without any pre-configured scope.
 <tr>
 <td>
 
+`pty:allow-clear-sessions`
+
+</td>
+<td>
+
+Enables the clear_sessions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`pty:deny-clear-sessions`
+
+</td>
+<td>
+
+Denies the clear_sessions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `pty:allow-exitstatus`
 
 </td>

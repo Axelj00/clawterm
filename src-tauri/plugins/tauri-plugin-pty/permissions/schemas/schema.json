@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the child_pid command without any pre-configured scope."
         },
         {
+          "description": "Enables the clear_sessions command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-clear-sessions",
+          "markdownDescription": "Enables the clear_sessions command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the clear_sessions command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-clear-sessions",
+          "markdownDescription": "Denies the clear_sessions command without any pre-configured scope."
+        },
+        {
           "description": "Enables the exitstatus command without any pre-configured scope.",
           "type": "string",
           "const": "allow-exitstatus",

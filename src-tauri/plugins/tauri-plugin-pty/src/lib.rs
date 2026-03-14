@@ -248,11 +248,24 @@ async fn foreground_pid(pid: PtyHandler, state: tauri::State<'_, PluginState>) -
     }
 }
 
+/// Kill and remove all active PTY sessions.
+/// Called on frontend unload to prevent zombie sessions across hot reloads.
+#[tauri::command]
+async fn clear_sessions(state: tauri::State<'_, PluginState>) -> Result<(), String> {
+    let mut sessions = state.sessions.write().await;
+    for (_id, session) in sessions.iter() {
+        let _ = session.child_killer.lock().await.kill();
+    }
+    sessions.clear();
+    state.session_id.store(0, Ordering::Relaxed);
+    Ok(())
+}
+
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("pty")
         .invoke_handler(tauri::generate_handler![
-            spawn, write, read, resize, kill, exitstatus, child_pid, foreground_pid
+            spawn, write, read, resize, kill, exitstatus, child_pid, foreground_pid, clear_sessions
         ])
         .setup(|app_handle, _api| {
             app_handle.manage(PluginState::default());
