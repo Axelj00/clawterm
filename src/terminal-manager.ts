@@ -497,30 +497,47 @@ export class TerminalManager {
     this.persistSession();
   }
 
+  /** Build the current session snapshot from live tab state. */
+  private buildSessionSnapshot(): { tabs: SessionTab[]; activeIndex: number } {
+    const tabs: SessionTab[] = [];
+    for (const tab of this.tabs.values()) {
+      // Only save tabs that have a resolved CWD — skip tabs that haven't
+      // been polled yet to avoid saving empty entries that can't be restored
+      const cwd = tab.lastFullCwd;
+      if (!cwd) continue;
+      tabs.push({
+        title: tab.manualTitle,
+        cwd,
+        splits: tab.serializeSplits(),
+      });
+    }
+    const ids = Array.from(this.tabs.keys());
+    const activeIndex = this.activeTabId ? ids.indexOf(this.activeTabId) : 0;
+    return { tabs, activeIndex: Math.max(0, activeIndex) };
+  }
+
   private persistSession() {
-    // Don't save session during shutdown — Rust clears the file on quit
     if (this.quitting) return;
     // Debounce: multiple rapid calls (tab switch, create, close) coalesce
     // into a single write after 500ms of quiet
     if (this.sessionTimer) clearTimeout(this.sessionTimer);
     this.sessionTimer = setTimeout(() => {
       if (this.quitting) return;
-      const tabs: SessionTab[] = [];
-      for (const tab of this.tabs.values()) {
-        // Only save tabs that have a resolved CWD — skip tabs that haven't
-        // been polled yet to avoid saving empty entries that can't be restored
-        const cwd = tab.lastFullCwd;
-        if (!cwd) continue;
-        tabs.push({
-          title: tab.manualTitle,
-          cwd,
-          splits: tab.serializeSplits(),
-        });
-      }
-      const ids = Array.from(this.tabs.keys());
-      const activeIndex = this.activeTabId ? ids.indexOf(this.activeTabId) : 0;
-      saveSession(tabs, Math.max(0, activeIndex));
+      const { tabs, activeIndex } = this.buildSessionSnapshot();
+      saveSession(tabs, activeIndex);
     }, 500);
+  }
+
+  /** Flush any pending debounced session save immediately. Call before dispose(). */
+  async flushSession() {
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+    const { tabs, activeIndex } = this.buildSessionSnapshot();
+    if (tabs.length > 0) {
+      await saveSession(tabs, activeIndex);
+    }
   }
 
   private handleTabOutputEvent(tabId: string, tab: Tab, event: OutputEvent) {

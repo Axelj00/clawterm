@@ -11,10 +11,10 @@ invoke("plugin:pty|clear_sessions").catch(() => {});
 const manager = new TerminalManager();
 manager.init();
 
-// On Cmd+Q / window close: clear session state so the app starts fresh.
-// This is the escape hatch when tabs get into a broken state.
+// On Cmd+Q / window close: flush session to disk so it can be restored on
+// next launch.  The debounced save may not have fired yet, so we save now.
 getCurrentWindow().onCloseRequested(async () => {
-  await invoke("clear_session").catch(() => {
+  await manager.flushSession().catch(() => {
     // Best-effort during shutdown — no UI to show errors
   });
   manager.dispose();
