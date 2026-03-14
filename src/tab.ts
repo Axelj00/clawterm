@@ -681,9 +681,13 @@ export class Tab {
     this.isVisible = true;
     this.state.needsAttention = false;
     this.element.classList.add("active");
+    // Two-frame delay: first frame lets the DOM settle (display: flex applied),
+    // second frame ensures xterm has dimensions before we focus
     requestAnimationFrame(() => {
       this.fitAllPanes();
-      this.focusedPane.focus();
+      requestAnimationFrame(() => {
+        this.focusedPane.focus();
+      });
     });
   }
 

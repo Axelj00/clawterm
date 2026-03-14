@@ -45,6 +45,7 @@ export class TerminalManager {
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
   private shortcutsPanelEl: HTMLDivElement | null = null;
   private creatingTab = false;
+  private quitting = false;
   private handleKey!: (e: KeyboardEvent) => boolean;
   private closedTabStack: { cwd: string; title?: string }[] = [];
 
@@ -455,10 +456,13 @@ export class TerminalManager {
   }
 
   private persistSession() {
+    // Don't save session during shutdown — Rust clears the file on quit
+    if (this.quitting) return;
     // Debounce: multiple rapid calls (tab switch, create, close) coalesce
     // into a single write after 500ms of quiet
     if (this.sessionTimer) clearTimeout(this.sessionTimer);
     this.sessionTimer = setTimeout(() => {
+      if (this.quitting) return;
       const tabs: SessionTab[] = [];
       for (const tab of this.tabs.values()) {
         tabs.push({
@@ -496,6 +500,9 @@ export class TerminalManager {
       const current = this.tabs.get(this.activeTabId);
       if (current) current.hide();
     }
+
+    // Dismiss any stuck overlays (paste confirm, close confirm) so they can't block input
+    document.querySelectorAll(".close-confirm-overlay").forEach((el) => el.remove());
 
     // Dismiss shortcuts panel if open
     if (this.shortcutsPanelEl) {
@@ -1110,6 +1117,7 @@ export class TerminalManager {
   }
 
   dispose() {
+    this.quitting = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
