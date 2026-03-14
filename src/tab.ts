@@ -60,6 +60,8 @@ export class Tab {
   private dividerCleanups = new Map<SplitBranch, AbortController>();
   /** Pending rAF ID from show() — cancelled on hide() to prevent stale focus */
   private showRafId: number | null = null;
+  /** Pending "completed" → "idle" fade timers per pane, to prevent stacking */
+  private fadeTimers = new Map<Pane, ReturnType<typeof setTimeout>>();
 
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
@@ -175,16 +177,21 @@ export class Tab {
           ps.activity = "error";
           ps.lastError = event.detail.slice(0, 50);
           break;
-        case "agent-completed":
+        case "agent-completed": {
           ps.activity = "completed";
-          setTimeout(() => {
+          // Clear any existing fade timer for this pane to prevent stacking
+          const prev = sourcePane ? this.fadeTimers.get(sourcePane) : undefined;
+          if (prev) clearTimeout(prev);
+          if (sourcePane) this.fadeTimers.set(sourcePane, setTimeout(() => {
+            this.fadeTimers.delete(sourcePane);
             if (ps.activity === "completed") {
               ps.activity = "idle";
               this.deriveTabState();
               this.updateTitle();
             }
-          }, this.config.advanced.completedFadeMs);
+          }, this.config.advanced.completedFadeMs));
           break;
+        }
       }
       logger.debug(
         `[handleOutputEvent] pane=${sourcePane?.id} paneState activity=${ps.activity} agent=${ps.agentName}`,
@@ -352,12 +359,12 @@ export class Tab {
       return;
     }
 
-    // Focus the new pane
+    // Focus the new pane (only if tab is still visible — user may have switched away)
     this.focusedPane = newPane;
     for (const p of this.panes) {
       p.element.classList.toggle("pane-focused", p === newPane);
     }
-    newPane.focus();
+    if (this.isVisible) newPane.focus();
 
     logger.debug(`[split] tab=${this.id} panesAfter=${this.panes.length} newPane=${newPane.id}`);
 
@@ -1114,6 +1121,10 @@ export class Tab {
   }
 
   dispose() {
+    // Clear any pending fade timers
+    for (const timer of this.fadeTimers.values()) clearTimeout(timer);
+    this.fadeTimers.clear();
+
     // Clean up document-level divider drag listeners
     for (const ac of this.dividerCleanups.values()) {
       ac.abort();
