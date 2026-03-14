@@ -43,6 +43,9 @@ function buildGroups(config: Config): ShortcutGroup[] {
         { label: "Close pane", binding: kb.closePane },
         { label: "Focus next pane", binding: kb.focusNextPane },
         { label: "Focus previous pane", binding: kb.focusPrevPane },
+        { label: "Resize pane", binding: "cmd+shift+arrow" },
+        { label: "Jump to pane 1-9", binding: "cmd+alt+1-9" },
+        { label: "Balance splits", binding: "Double-click divider" },
       ],
     },
     {
