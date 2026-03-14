@@ -457,18 +457,10 @@ body {
 
 #sidebar-footer {
   padding: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-
-#sidebar-footer .update-notice {
-  flex-basis: 100%;
 }
 
 #new-tab-btn {
-  flex: 1;
+  width: 100%;
   padding: 6px;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -486,49 +478,42 @@ body {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-#shortcuts-btn {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
+/* Utility buttons — floating bottom-right over the terminal area */
+#utility-buttons {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  z-index: 40;
+  display: flex;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+#utility-buttons button {
+  width: 24px;
+  height: 20px;
   padding: 0;
   background: transparent;
   border: none;
-  color: var(--sidebar-tab-text);
-  font-size: 16px;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 13px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 4px;
   transition: all 0.12s ease;
   -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#shortcuts-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.7);
+#utility-buttons button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 #shortcuts-btn.active {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
-}
-
-#update-btn {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: var(--sidebar-tab-text);
-  font-size: 16px;
-  cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.12s ease;
-  -webkit-app-region: no-drag;
-}
-
-#update-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.7);
 }
 
 #update-btn.up-to-date {
@@ -1080,13 +1065,16 @@ body {
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* Update notice (sidebar) */
+/* Update notice — floating above utility buttons in bottom-right */
 .update-notice {
+  position: absolute;
+  bottom: 28px;
+  right: 8px;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  margin-bottom: 6px;
   border-radius: 6px;
   background: rgba(10, 132, 255, 0.08);
   border: 1px solid rgba(10, 132, 255, 0.2);

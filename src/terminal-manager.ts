@@ -231,16 +231,6 @@ export class TerminalManager {
             "div",
             { id: "sidebar-footer" },
             el("button", { id: "new-tab-btn" }, "+ New Tab"),
-            el(
-              "button",
-              { id: "shortcuts-btn", "aria-label": "Keyboard shortcuts", title: "Keyboard Shortcuts" },
-              "\u2328",
-            ),
-            el(
-              "button",
-              { id: "update-btn", "aria-label": "Check for updates", title: "Check for Updates" },
-              "\u21BB",
-            ),
           ),
         ),
         el("div", { id: "sidebar-divider" }),
@@ -256,6 +246,20 @@ export class TerminalManager {
             el("span", { id: "status-process" }),
             el("span", { id: "status-server" }),
             el("span", { id: "status-agent" }),
+          ),
+          el(
+            "div",
+            { id: "utility-buttons" },
+            el(
+              "button",
+              { id: "shortcuts-btn", "aria-label": "Keyboard shortcuts", title: "Keyboard Shortcuts" },
+              "\u2328\uFE0E",
+            ),
+            el(
+              "button",
+              { id: "update-btn", "aria-label": "Check for updates", title: "Check for Updates" },
+              "\u2193",
+            ),
           ),
         ),
       ),
