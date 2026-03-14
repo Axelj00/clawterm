@@ -18,11 +18,12 @@ We use [semver](https://semver.org/): patch for bug fixes, minor for features, m
   - Move items from `[Unreleased]` to new version section with today's date
   - Add compare link at bottom
   - Update `[Unreleased]` link to compare from new version
-- [ ] Local checks pass:
+- [ ] Format code: `npm run format`
+- [ ] Commit: `git commit -m "Bump version to X.Y.Z"`
+- [ ] Verify the final commit passes all checks (this is what CI will run on the tag):
   ```bash
   npm run lint && npm run format:check && npm run test && npx tsc --noEmit
   ```
-- [ ] Commit: `git commit -m "Bump version to X.Y.Z"`
 - [ ] Tag and push:
   ```bash
   git tag vX.Y.Z
