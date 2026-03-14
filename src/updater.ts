@@ -3,12 +3,22 @@ import { logger } from "./logger";
 import { trapFocus } from "./utils";
 
 const CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
+const JUST_UPDATED_KEY = "clawterm_last_update_ts";
 let updateFound = false;
 let manualCheckInProgress = false;
 
 export function startUpdateChecker(): void {
-  // First check after 3 seconds
-  setTimeout(checkForUpdates, 3000);
+  // Skip the initial check if the app was just updated (within last 30s)
+  const lastUpdate = parseInt(localStorage.getItem(JUST_UPDATED_KEY) || "0", 10);
+  const justUpdated = Date.now() - lastUpdate < 30_000;
+
+  if (justUpdated) {
+    localStorage.removeItem(JUST_UPDATED_KEY);
+    logger.debug("Skipping initial update check — app was just updated");
+  } else {
+    // First check after 3 seconds
+    setTimeout(checkForUpdates, 3000);
+  }
 
   // Then check periodically
   setInterval(() => {
@@ -34,15 +44,7 @@ export async function manualCheckForUpdates(): Promise<void> {
     } else {
       updateFound = true;
       logger.debug(`Update available: ${update.version}`);
-      showUpdateNotice(update.version, async () => {
-        try {
-          await update.downloadAndInstall();
-          const { relaunch } = await import("@tauri-apps/plugin-process");
-          await relaunch();
-        } catch (e) {
-          logger.debug("Update install failed:", e);
-        }
-      });
+      showUpdateNotice(update.version, () => installLatest());
     }
   } catch (e) {
     logger.debug("Manual update check failed:", e);
@@ -58,17 +60,32 @@ async function checkForUpdates(): Promise<void> {
 
     updateFound = true;
     logger.debug(`Update available: ${update.version}`);
-    showUpdateNotice(update.version, async () => {
-      try {
-        await update.downloadAndInstall();
-        const { relaunch } = await import("@tauri-apps/plugin-process");
-        await relaunch();
-      } catch (e) {
-        logger.debug("Update install failed:", e);
-      }
-    });
+    showUpdateNotice(update.version, () => installLatest());
   } catch (e) {
     logger.debug("Update check skipped:", e);
+  }
+}
+
+/**
+ * Re-check for the absolute latest version before downloading to avoid
+ * stepping through intermediate releases if multiple were published.
+ */
+async function installLatest(): Promise<void> {
+  try {
+    // Fresh check to ensure we download the very latest, not a stale reference
+    const latest = await check();
+    if (!latest) {
+      logger.debug("No update found on re-check before install");
+      return;
+    }
+    logger.debug(`Installing latest version: ${latest.version}`);
+    localStorage.setItem(JUST_UPDATED_KEY, String(Date.now()));
+    await latest.downloadAndInstall();
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+  } catch (e) {
+    logger.debug("Update install failed:", e);
+    localStorage.removeItem(JUST_UPDATED_KEY);
   }
 }
 
