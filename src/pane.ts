@@ -45,6 +45,7 @@ export class Pane {
   private cwd: string | undefined;
   lastFullCwd: string | null = null;
   private scrollPill: HTMLDivElement | null = null;
+  private pasteOverlay: HTMLDivElement | null = null;
   private isScrolledUp = false;
   private eventGutter: HTMLDivElement | null = null;
   private gutterTimer: ReturnType<typeof setInterval> | null = null;
@@ -191,7 +192,10 @@ export class Pane {
         this.terminal.onSelectionChange(() => {
           const selection = this.terminal.getSelection();
           if (selection) {
-            navigator.clipboard.writeText(selection).catch((e) => logger.debug("Clipboard write failed:", e));
+            navigator.clipboard.writeText(selection).catch((e) => {
+              logger.debug("Clipboard write failed:", e);
+              showToast("Failed to copy to clipboard", "error");
+            });
           }
         }),
       );
@@ -211,7 +215,10 @@ export class Pane {
               if (selection)
                 navigator.clipboard
                   .writeText(selection)
-                  .catch((e) => logger.debug("Clipboard write failed:", e));
+                  .catch((e) => {
+                    logger.debug("Clipboard write failed:", e);
+                    showToast("Failed to copy to clipboard", "error");
+                  });
             },
           },
           {
@@ -228,7 +235,10 @@ export class Pane {
                     this.terminal.paste(text);
                   }
                 })
-                .catch((e) => logger.debug("Clipboard read failed:", e));
+                .catch((e) => {
+                  logger.debug("Clipboard read failed:", e);
+                  showToast("Failed to read clipboard", "error");
+                });
             },
           },
           {
@@ -495,13 +505,14 @@ export class Pane {
       return;
     }
 
-    // Remove any existing paste confirm dialog
-    document.querySelector(".close-confirm-overlay.paste-confirm")?.remove();
+    // Remove any existing paste confirm dialog for this pane
+    this.pasteOverlay?.remove();
 
     const lineCount = text.split("\n").length;
     const preview = text.length > 300 ? text.slice(0, 300) + "\u2026" : text;
 
     const overlay = document.createElement("div");
+    this.pasteOverlay = overlay;
     overlay.className = "close-confirm-overlay paste-confirm";
 
     const dialog = document.createElement("div");
@@ -551,6 +562,7 @@ export class Pane {
     const dismiss = () => {
       removeTrap();
       overlay.remove();
+      this.pasteOverlay = null;
       if (!this.disposed) this.terminal.focus();
     };
 
@@ -643,8 +655,9 @@ export class Pane {
   dispose() {
     logger.debug(`[pane.dispose] pane=${this.id} ptyPid=${this.ptyPid}`);
     this.disposed = true;
-    // Dismiss any open paste confirm dialog
-    document.querySelector(".close-confirm-overlay.paste-confirm")?.remove();
+    // Dismiss any open paste confirm dialog for this pane
+    this.pasteOverlay?.remove();
+    this.pasteOverlay = null;
     // Remove all DOM event listeners registered with AbortController
     this.ac.abort();
     // Dispose all xterm event subscriptions
