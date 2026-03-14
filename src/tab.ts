@@ -57,6 +57,8 @@ export class Tab {
   private panes: Pane[] = [];
   /** Cleanup functions for document-level drag listeners, keyed by branch */
   private dividerCleanups = new Map<SplitBranch, () => void>();
+  /** Pending rAF ID from show() — cancelled on hide() to prevent stale focus */
+  private showRafId: number | null = null;
 
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
@@ -963,11 +965,13 @@ export class Tab {
     this.state.needsAttention = false;
     this.element.classList.add("active");
     // Two-frame delay: first frame lets the DOM settle (display: flex applied),
-    // second frame ensures xterm has dimensions before we focus
-    requestAnimationFrame(() => {
+    // second frame ensures xterm has dimensions before we focus.
+    // Track the rAF so hide() can cancel it if the user switches away quickly.
+    this.showRafId = requestAnimationFrame(() => {
       this.fitAllPanes();
-      requestAnimationFrame(() => {
-        this.focusedPane.focus();
+      this.showRafId = requestAnimationFrame(() => {
+        this.showRafId = null;
+        if (this.isVisible) this.focusedPane.focus();
       });
     });
   }
@@ -975,6 +979,11 @@ export class Tab {
   hide() {
     this.isVisible = false;
     this.element.classList.remove("active");
+    // Cancel any pending show() rAF to prevent stale focus stealing
+    if (this.showRafId !== null) {
+      cancelAnimationFrame(this.showRafId);
+      this.showRafId = null;
+    }
   }
 
   fit() {
