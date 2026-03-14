@@ -1,5 +1,30 @@
 export type TabActivity = "idle" | "running" | "agent-waiting" | "server-running" | "error" | "completed";
 
+/** Per-pane state — tracks each pane's activity independently */
+export interface PaneState {
+  folderName: string;
+  processName: string;
+  isIdle: boolean;
+  activity: TabActivity;
+  agentName: string | null;
+  serverPort: number | null;
+  lastError: string | null;
+  agentStartedAt: number | null;
+}
+
+export function createDefaultPaneState(): PaneState {
+  return {
+    folderName: "~",
+    processName: "",
+    isIdle: true,
+    activity: "idle",
+    agentName: null,
+    serverPort: null,
+    lastError: null,
+    agentStartedAt: null,
+  };
+}
+
 export interface TabState {
   folderName: string;
   processName: string;
@@ -29,6 +54,13 @@ export function createDefaultTabState(): TabState {
     gitBranch: null,
     agentStartedAt: null,
   };
+}
+
+/** Tab title shown in sidebar — just the folder name with a leading slash */
+export function computeFolderTitle(state: TabState): string {
+  const folder = state.folderName || "~";
+  if (folder === "~" || folder === "/") return folder;
+  return `/${folder}`;
 }
 
 export function computeDisplayTitle(state: TabState): string {
@@ -64,6 +96,28 @@ export function computeSubtitle(state: TabState): string | null {
     return `${state.agentName}${elapsed}`;
   }
   if (!state.isIdle && state.processName && state.activity === "running") return state.processName;
+  return null;
+}
+
+/** Compute a single status line for a pane (shown in sidebar under tab title) */
+export function computePaneStatusLine(state: PaneState): string | null {
+  if (state.activity === "agent-waiting" && state.agentName) {
+    const elapsed = state.agentStartedAt ? ` (${formatElapsed(state.agentStartedAt)})` : "";
+    return `${state.agentName} waiting for input${elapsed}`;
+  }
+  if (state.activity === "running" && state.agentName) {
+    const elapsed = state.agentStartedAt ? ` (${formatElapsed(state.agentStartedAt)})` : "";
+    return `${state.agentName} working...${elapsed}`;
+  }
+  if (state.activity === "server-running" && state.serverPort) {
+    return `localhost:${state.serverPort}`;
+  }
+  if (state.activity === "error" && state.lastError) {
+    return state.lastError;
+  }
+  if (state.activity === "running" && state.processName) {
+    return state.processName;
+  }
   return null;
 }
 
