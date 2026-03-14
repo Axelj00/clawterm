@@ -802,6 +802,51 @@ body {
   color: var(--color-red);
 }
 
+/* Event timeline gutter — thin strip on the right edge of each pane */
+.event-gutter {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  bottom: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.event-marker {
+  position: absolute;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.1s, transform 0.1s;
+}
+
+.event-marker:hover {
+  opacity: 1;
+  transform: scale(1.5);
+}
+
+.event-marker-agent-waiting {
+  background: var(--color-orange);
+}
+
+.event-marker-error,
+.event-marker-server-crashed {
+  background: var(--color-red);
+}
+
+.event-marker-server-started {
+  background: var(--color-green);
+}
+
+.event-marker-agent-completed {
+  background: var(--sidebar-accent);
+}
+
 /* Scroll pill — "New output ↓" indicator */
 .scroll-pill {
   position: absolute;

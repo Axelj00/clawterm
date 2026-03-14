@@ -9,6 +9,9 @@ const decoder = new TextDecoder();
 /** Debounce interval for regex matching (ms) */
 const MATCH_DEBOUNCE_MS = 100;
 
+/** Max number of events to retain in history */
+const MAX_EVENT_HISTORY = 200;
+
 export class OutputAnalyzer {
   private buffer = "";
   private readonly bufferSize: number;
@@ -20,6 +23,14 @@ export class OutputAnalyzer {
   /** Pending text accumulated between debounced match runs */
   private pendingText = "";
   private matchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Stored event history with positions for timeline rendering */
+  readonly eventHistory: OutputEvent[] = [];
+
+  /** Current terminal line (set externally by Pane) */
+  currentLine = 0;
+  /** Total scrollback lines (set externally by Pane) */
+  totalLines = 0;
 
   constructor(bufferSize = 4096, customMatchers?: OutputMatcher[]) {
     this.bufferSize = bufferSize;
@@ -65,12 +76,28 @@ export class OutputAnalyzer {
       const match = matchText.match(matcher.pattern);
       if (match) {
         this.lastFired.set(matcher.id, now);
+
+        // Capture context lines for agent-waiting events
+        let contextLines: string[] | undefined;
+        if (matcher.type === "agent-waiting") {
+          const lines = this.buffer.split("\n");
+          contextLines = lines.slice(-5).map((l) => l.trim()).filter(Boolean);
+        }
+
         const event: OutputEvent = {
           type: matcher.type,
           detail: match[0],
           timestamp: now,
+          line: this.currentLine,
+          contextLines,
           ...(matcher.extract?.(match) ?? {}),
         };
+
+        this.eventHistory.push(event);
+        if (this.eventHistory.length > MAX_EVENT_HISTORY) {
+          this.eventHistory.shift();
+        }
+
         this.listener?.(event);
       }
     }
@@ -104,5 +131,6 @@ export class OutputAnalyzer {
     this.pendingText = "";
     this.overlapWindow = "";
     this.lastFired.clear();
+    this.eventHistory.length = 0;
   }
 }

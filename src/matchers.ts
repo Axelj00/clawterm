@@ -4,6 +4,10 @@ export interface OutputEvent {
   timestamp: number;
   port?: number;
   agentName?: string;
+  /** Terminal line number when this event was detected */
+  line?: number;
+  /** Context lines captured around the event (for agent prompts) */
+  contextLines?: string[];
 }
 
 export interface OutputMatcher {

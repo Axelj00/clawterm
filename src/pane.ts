@@ -42,6 +42,8 @@ export class Pane {
   lastFullCwd: string | null = null;
   private scrollPill: HTMLDivElement | null = null;
   private isScrolledUp = false;
+  private eventGutter: HTMLDivElement | null = null;
+  private gutterTimer: ReturnType<typeof setInterval> | null = null;
   private readonly ac = new AbortController();
   private readonly disposables: { dispose(): void }[] = [];
 
@@ -312,6 +314,10 @@ export class Pane {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
         this.terminal.write(bytes);
         if (this.config.outputAnalysis?.enabled !== false) {
+          // Update analyzer with current terminal position before feeding
+          const buf = this.terminal.buffer.active;
+          this.analyzer.currentLine = buf.baseY + buf.cursorY;
+          this.analyzer.totalLines = buf.baseY + this.terminal.rows;
           this.analyzer.feed(bytes);
         }
         if (this.isScrolledUp) {
@@ -348,6 +354,15 @@ export class Pane {
     );
 
     this.searchBar = new SearchBar(this.element, this.searchAddon, () => this.terminal.focus());
+
+    // Event timeline gutter — renders markers for detected output events
+    if (this.config.outputAnalysis?.enabled !== false) {
+      this.eventGutter = document.createElement("div");
+      this.eventGutter.className = "event-gutter";
+      this.element.appendChild(this.eventGutter);
+      // Update gutter periodically (events may accumulate between renders)
+      this.gutterTimer = setInterval(() => this.renderGutter(), 2000);
+    }
 
     // Track scroll position to show "new output" pill
     this.disposables.push(
@@ -499,6 +514,44 @@ export class Pane {
     }
   }
 
+  /** Render event markers in the scrollbar gutter */
+  private renderGutter() {
+    if (!this.eventGutter || this.disposed) return;
+    const events = this.analyzer.eventHistory;
+    if (events.length === 0) {
+      this.eventGutter.innerHTML = "";
+      return;
+    }
+
+    const totalLines = this.analyzer.totalLines || 1;
+    const gutterHeight = this.eventGutter.clientHeight;
+    if (gutterHeight === 0) return;
+
+    // Build markers — reuse DOM when possible
+    const frag = document.createDocumentFragment();
+    for (const evt of events) {
+      const line = evt.line ?? 0;
+      const pct = Math.min(1, line / totalLines);
+      const top = Math.round(pct * gutterHeight);
+
+      const marker = document.createElement("div");
+      marker.className = `event-marker event-marker-${evt.type}`;
+      marker.style.top = `${top}px`;
+      marker.title = `${evt.type}: ${evt.detail.slice(0, 60)}`;
+
+      // Click to scroll to approximate position
+      marker.addEventListener("click", () => {
+        const scrollTo = Math.max(0, line - Math.floor(this.terminal.rows / 2));
+        this.terminal.scrollToLine(scrollTo);
+      });
+
+      frag.appendChild(marker);
+    }
+
+    this.eventGutter.innerHTML = "";
+    this.eventGutter.appendChild(frag);
+  }
+
   /** Send SIGINT (Ctrl-C) to the PTY foreground process group. */
   sendInterrupt() {
     if (this.pty && !this.disposed) {
@@ -526,6 +579,10 @@ export class Pane {
     this.analyzer.dispose();
     this.searchBar?.dispose();
     this.hideScrollPill();
+    if (this.gutterTimer) {
+      clearInterval(this.gutterTimer);
+      this.gutterTimer = null;
+    }
     this.terminal.dispose();
     this.element.remove();
   }
