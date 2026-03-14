@@ -39,6 +39,7 @@ export class TerminalManager {
   private tabSwitcher = new TabSwitcher();
   private tabRenderer!: TabRenderer;
   private resizeObserver: ResizeObserver | null = null;
+  private resizeRaf = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private unlistenFocus: (() => void) | null = null;
   private lastBackgroundPoll = 0;
@@ -1160,6 +1161,7 @@ export class TerminalManager {
     let pollCycleCount = 0;
 
     this.pollTimer = setInterval(async () => {
+      if (this.quitting) return;
       pollCycleCount++;
       const now = Date.now();
       const pollBackground = now - this.lastBackgroundPoll >= bgInterval;
@@ -1195,10 +1197,11 @@ export class TerminalManager {
   }
 
   private setupResize() {
-    let resizeRaf = 0;
     this.resizeObserver = new ResizeObserver(() => {
-      if (resizeRaf) cancelAnimationFrame(resizeRaf);
-      resizeRaf = requestAnimationFrame(() => {
+      if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
+      this.resizeRaf = requestAnimationFrame(() => {
+        this.resizeRaf = 0;
+        if (this.quitting) return;
         if (this.activeTabId) {
           const tab = this.tabs.get(this.activeTabId);
           if (tab) tab.fit();
@@ -1219,6 +1222,10 @@ export class TerminalManager {
     if (this.sessionTimer) {
       clearTimeout(this.sessionTimer);
       this.sessionTimer = null;
+    }
+    if (this.resizeRaf) {
+      cancelAnimationFrame(this.resizeRaf);
+      this.resizeRaf = 0;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
