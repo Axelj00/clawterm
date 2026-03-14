@@ -175,61 +175,72 @@ mod platform {
         )
     }
 
+    fn debug_log(msg: &str) {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true).append(true)
+            .open("/tmp/clawterm-proc-debug.log")
+        {
+            let _ = writeln!(f, "{msg}");
+        }
+    }
+
     pub fn get_foreground_process(pid: u32) -> Result<ProcessInfo, String> {
         let mut current_pid = pid;
         let mut current_name = get_proc_name(pid).unwrap_or_default();
 
-        // Track the last known agent we passed through during the walk.
-        // This catches both native agents (claude, codex binaries) and
-        // script-based agents (gemini as node script) at any tree depth.
         let mut agent_pid: Option<u32> = None;
         let mut agent_name: Option<String> = None;
+        let mut depth = 0u32;
+
+        debug_log(&format!("[walk] START shell={pid} name={current_name:?}"));
 
         loop {
             let children = list_child_pids(current_pid);
             if children.is_empty() {
+                debug_log(&format!("[walk]   pid={current_pid} name={current_name:?} -> LEAF (no children)"));
                 break;
             }
-            // Pick the last (newest) child — highest PID is most likely
-            // the foreground process when background jobs are present
+            debug_log(&format!("[walk]   pid={current_pid} name={current_name:?} -> children={children:?}"));
+
             let child_pid = children[children.len() - 1];
             current_name = get_proc_name(child_pid).unwrap_or_default();
             current_pid = child_pid;
 
-            // Check for known agent — either by binary name or by
-            // inspecting args for script-based agents (node, python, etc.)
             let mut resolved_name = current_name.clone();
             if matches!(resolved_name.as_str(), "node" | "python" | "python3" | "ruby") {
                 if let Some(friendly) = friendly_name_from_args(current_pid) {
-                    resolved_name = friendly;
+                    resolved_name = friendly.clone();
                 }
             }
+            debug_log(&format!("[walk]     picked={child_pid} proc_name={current_name:?} resolved={resolved_name:?} is_agent={}", is_known_agent(&resolved_name)));
             if is_known_agent(&resolved_name) {
                 agent_pid = Some(current_pid);
                 agent_name = Some(resolved_name);
             }
+
+            depth += 1;
+            if depth > 20 { break; }
         }
 
-        // Resolve final process name for script-based tools at the leaf
         if matches!(current_name.as_str(), "node" | "python" | "python3" | "ruby") {
             if let Some(friendly) = friendly_name_from_args(current_pid) {
                 current_name = friendly;
             }
         }
 
-        // If the deepest child is not an agent but we passed through one,
-        // return the agent. Handles agents that spawn subshells/helpers
-        // (e.g. claude → zsh, gemini(node) → child workers).
-        if !is_known_agent(&current_name) {
+        let result = if !is_known_agent(&current_name) {
             if let (Some(ap), Some(an)) = (agent_pid, agent_name) {
-                return Ok(ProcessInfo { name: an, pid: ap });
+                ProcessInfo { name: an, pid: ap }
+            } else {
+                ProcessInfo { name: current_name, pid: current_pid }
             }
-        }
+        } else {
+            ProcessInfo { name: current_name, pid: current_pid }
+        };
 
-        Ok(ProcessInfo {
-            name: current_name,
-            pid: current_pid,
-        })
+        debug_log(&format!("[walk] RESULT for shell={pid}: name={:?} pid={}", result.name, result.pid));
+        Ok(result)
     }
 
     fn list_child_pids(ppid: u32) -> Vec<u32> {

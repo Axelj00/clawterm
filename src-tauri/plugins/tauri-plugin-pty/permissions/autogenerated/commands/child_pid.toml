@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-child-pid"
+description = "Enables the child_pid command without any pre-configured scope."
+commands.allow = ["child_pid"]
+
+[[permission]]
+identifier = "deny-child-pid"
+description = "Denies the child_pid command without any pre-configured scope."
+commands.deny = ["child_pid"]

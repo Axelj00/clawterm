@@ -647,10 +647,16 @@ export class Tab {
   async pollProcessInfo() {
     if (this.pollStopped) return;
 
+    // Debug: log pane PIDs
+    for (const p of this.panes) {
+      const info = p.getProcessInfo();
+      console.warn(`[poll-debug] pane=${p.id} pid=${info.pid} disposed=${info.disposed}`);
+    }
+
     // Poll all panes concurrently
     const polls = this.panes
       .filter((p) => !p.getProcessInfo().disposed && p.getProcessInfo().pid)
-      .map((pane) => this.pollPane(pane).catch(() => {}));
+      .map((pane) => this.pollPane(pane).catch((e) => { console.warn(`[poll-debug] pollPane error for ${pane.id}:`, e); }));
 
     await Promise.all(polls);
 
@@ -675,7 +681,7 @@ export class Tab {
         timeout,
       );
 
-      logger.debug(`[poll] pane shell=${shellPid} fg=${procInfo.pid} name="${procInfo.name}" idle=${procInfo.pid === shellPid}`);
+      console.warn(`[poll-debug] pane=${pane.id} shell=${shellPid} fg=${procInfo.pid} name="${procInfo.name}" idle=${procInfo.pid === shellPid}`);
 
       const wasIdle = ps.isIdle;
       const newIsIdle = procInfo.pid === shellPid;

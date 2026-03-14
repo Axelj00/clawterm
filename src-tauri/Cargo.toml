@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
-tauri-plugin-pty = "0.2"
+tauri-plugin-pty = { path = "plugins/tauri-plugin-pty" }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-opener = "2"

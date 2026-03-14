@@ -6,6 +6,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { ImageAddon } from "@xterm/addon-image";
+import { invoke } from "@tauri-apps/api/core";
 import { spawn, type IPty } from "tauri-pty";
 import type { Config } from "./config";
 import { OutputAnalyzer } from "./output-analyzer";
@@ -322,7 +323,16 @@ export class Pane {
       logger.warn("PTY spawn returned null");
       return false;
     }
-    this.ptyPid = this.pty.pid;
+    // The pty plugin's .pid is an internal session ID (0, 1, 2...), NOT the OS PID.
+    // Wait for the pty to initialize, then fetch the real shell PID.
+    const ptyInit = (this.pty as any)._init as Promise<number> | undefined;
+    if (ptyInit) {
+      ptyInit.then((handle) => {
+        return invoke<number>("plugin:pty|child_pid", { pid: handle });
+      }).then((osPid) => {
+        this.ptyPid = osPid;
+      }).catch((e) => logger.warn("Failed to get shell PID:", e));
+    }
 
     this.pty.onData((data: Uint8Array | number[]) => {
       if (!this.disposed) {
@@ -394,10 +404,7 @@ export class Pane {
 
   /** Get process info for polling (used by Tab) */
   getProcessInfo(): { pid: number | null; disposed: boolean } {
-    // Read pid from the pty directly — tauri-pty sets it asynchronously
-    // after spawn, so the cached ptyPid from construction time may be undefined.
-    const pid = (this.pty as any)?.pid ?? this.ptyPid ?? null;
-    return { pid, disposed: this.disposed };
+    return { pid: this.ptyPid, disposed: this.disposed };
   }
 
   toggleSearch() {
