@@ -60,6 +60,15 @@ fn write_session(contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn clear_session() -> Result<(), String> {
+    let path = session_path();
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn validate_shell(path: String) -> Result<bool, String> {
     use std::os::unix::fs::PermissionsExt;
     let p = std::path::Path::new(&path);
@@ -91,6 +100,7 @@ fn main() {
             write_config,
             read_session,
             write_session,
+            clear_session,
             process_info::get_foreground_process,
             process_info::get_process_cwd,
             process_info::get_process_cwd_full,
