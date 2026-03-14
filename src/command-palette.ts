@@ -73,8 +73,7 @@ export function showCommandPalette(commands: PaletteCommand[]): void {
     } else {
       filtered = commands.filter(
         (c) =>
-          c.label.toLowerCase().includes(query) ||
-          (c.category && c.category.toLowerCase().includes(query)),
+          c.label.toLowerCase().includes(query) || (c.category && c.category.toLowerCase().includes(query)),
       );
     }
     selectedIdx = 0;

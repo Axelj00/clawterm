@@ -195,9 +195,7 @@ export class TerminalManager {
     // Right-click on new-tab button shows startup command options
     document.getElementById("new-tab-btn")!.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      const items: ContextMenuItem[] = [
-        { label: "New Tab", action: () => this.createTab() },
-      ];
+      const items: ContextMenuItem[] = [{ label: "New Tab", action: () => this.createTab() }];
       const cmds = this.config.startupCommands;
       if (Object.keys(cmds).length > 0) {
         let first = true;
@@ -678,7 +676,12 @@ export class TerminalManager {
         category: "Terminal",
         action: () => this.tabs.get(this.activeTabId!)?.toggleSearch(),
       },
-      { id: "reload-config", label: "Reload Config", category: "Terminal", action: () => this.reloadConfig() },
+      {
+        id: "reload-config",
+        label: "Reload Config",
+        category: "Terminal",
+        action: () => this.reloadConfig(),
+      },
       {
         id: "shortcuts",
         label: "Keyboard Shortcuts",
