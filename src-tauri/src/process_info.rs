@@ -228,8 +228,9 @@ mod platform {
                 return vec![];
             }
 
-            // Over-allocate to handle TOCTOU race (children spawned between calls)
-            let capacity = (count as usize) + 16;
+            // Over-allocate to handle TOCTOU race (children spawned between calls).
+            // Cap at 4096 to prevent allocation overflow from extreme values.
+            let capacity = (count as usize).min(4096) + 16;
             let buf_size = capacity * mem::size_of::<libc::c_int>();
             let mut pids: Vec<libc::c_int> = vec![0; capacity];
 
@@ -260,8 +261,10 @@ mod platform {
             if ret <= 0 {
                 return None;
             }
+            // Clamp to buffer size to prevent out-of-bounds slice on unexpected return values
+            let len = (ret as usize).min(buf.len());
             Some(
-                std::str::from_utf8(&buf[..ret as usize])
+                std::str::from_utf8(&buf[..len])
                     .unwrap_or("")
                     .to_string(),
             )
@@ -371,6 +374,12 @@ mod platform {
         struct VnodeInfoPath {
             // macOS vnode_info is 152 bytes (vinfo_stat=136 + vnode fields).
             // Previously 160, which caused CWD paths to be truncated by 8 chars.
+            //
+            // WARNING: This struct layout is macOS version-dependent. The kernel
+            // defines `struct vnode_info_path` in <sys/proc_info.h> and the
+            // padding here must match the platform's actual layout. If macOS
+            // changes the struct size, proc_pidinfo will return a different
+            // byte count and our path extraction will be wrong.
             _vip_vi: [u8; 152],
             vip_path: [libc::c_char; 1024],
         }
@@ -380,6 +389,18 @@ mod platform {
             pvi_cdir: VnodeInfoPath,
             _pvi_rdir: VnodeInfoPath,
         }
+
+        // Validate that our struct sizes match the expected macOS layout.
+        // VnodeInfoPath = 152 (vnode_info) + 1024 (MAXPATHLEN) = 1176 bytes.
+        // ProcVnodePathInfo = 2 * VnodeInfoPath = 2352 bytes.
+        const _: () = assert!(
+            mem::size_of::<VnodeInfoPath>() == 1176,
+            "VnodeInfoPath size mismatch — macOS struct layout may have changed"
+        );
+        const _: () = assert!(
+            mem::size_of::<ProcVnodePathInfo>() == 2352,
+            "ProcVnodePathInfo size mismatch — macOS struct layout may have changed"
+        );
 
         unsafe {
             let mut info: ProcVnodePathInfo = mem::zeroed();
