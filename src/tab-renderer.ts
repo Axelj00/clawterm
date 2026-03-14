@@ -119,13 +119,12 @@ export class TabRenderer {
         refs.hint.style.display = "none";
       }
 
-      // Update per-pane status lines
+      // Update per-pane status lines — every pane always gets a line
       const paneStates = tab.getPaneStates();
-      const lines: { text: string; activity: string }[] = [];
-      for (const ps of paneStates) {
-        const text = computePaneStatusLine(ps);
-        if (text) lines.push({ text, activity: ps.activity });
-      }
+      const lines: { text: string; activity: string }[] = paneStates.map((ps) => ({
+        text: computePaneStatusLine(ps),
+        activity: ps.activity,
+      }));
 
       // Rebuild pane list only if content changed
       const paneKey = lines.map((l) => `${l.activity}:${l.text}`).join("|");

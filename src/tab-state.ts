@@ -99,8 +99,9 @@ export function computeSubtitle(state: TabState): string | null {
   return null;
 }
 
-/** Compute a single status line for a pane (shown in sidebar under tab title) */
-export function computePaneStatusLine(state: PaneState): string | null {
+/** Compute a single status line for a pane (shown in sidebar under tab title).
+ *  Always returns a string — every pane gets a line in the sidebar. */
+export function computePaneStatusLine(state: PaneState): string {
   if (state.activity === "agent-waiting") {
     const name = state.agentName ?? "agent";
     const elapsed = state.agentStartedAt ? ` (${formatElapsed(state.agentStartedAt)})` : "";
@@ -119,7 +120,7 @@ export function computePaneStatusLine(state: PaneState): string | null {
   if (state.activity === "running" && state.processName) {
     return state.processName;
   }
-  return null;
+  return "idle";
 }
 
 // Minimal 12x12 SVG icons (Linear/Vercel style)

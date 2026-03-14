@@ -730,15 +730,21 @@ export class Tab {
 
       if (fullCwd && fullCwd !== pane.lastFullCwd) {
         pane.lastFullCwd = fullCwd;
-        // Get project/git info for the focused pane (used in tab-level state)
-        if (pane === this.focusedPane) {
+        // Get project/git info — always look up for focused pane,
+        // and for other panes if we don't have a project name yet
+        if (pane === this.focusedPane || !this.state.projectName) {
           try {
             const [projectName, gitBranch] = await Promise.all([
               invokeWithTimeout<string>("get_project_info", { dir: fullCwd }, timeout),
               invokeWithTimeout<string>("get_git_branch", { dir: fullCwd }, timeout),
             ]);
-            this.state.projectName = projectName && projectName !== folder ? projectName : null;
-            this.state.gitBranch = gitBranch || null;
+            if (pane === this.focusedPane) {
+              this.state.projectName = projectName || null;
+              this.state.gitBranch = gitBranch || null;
+            } else if (!this.state.projectName && projectName) {
+              // Use non-focused pane's project name as fallback
+              this.state.projectName = projectName;
+            }
           } catch (e) {
             logger.debug("Failed to get project/git info:", e);
           }
