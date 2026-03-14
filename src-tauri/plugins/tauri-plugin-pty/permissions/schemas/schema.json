@@ -319,6 +319,18 @@
           "markdownDescription": "Denies the exitstatus command without any pre-configured scope."
         },
         {
+          "description": "Enables the foreground_pid command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-foreground-pid",
+          "markdownDescription": "Enables the foreground_pid command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the foreground_pid command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-foreground-pid",
+          "markdownDescription": "Denies the foreground_pid command without any pre-configured scope."
+        },
+        {
           "description": "Enables the kill command without any pre-configured scope.",
           "type": "string",
           "const": "allow-kill",

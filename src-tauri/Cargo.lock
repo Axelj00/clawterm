@@ -4193,6 +4193,7 @@ dependencies = [
 name = "tauri-plugin-pty"
 version = "0.2.1"
 dependencies = [
+ "libc",
  "portable-pty",
  "serde",
  "serde_json",

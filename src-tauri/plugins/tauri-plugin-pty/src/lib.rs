@@ -26,6 +26,8 @@ struct Session {
     child_killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     writer: Mutex<Box<dyn std::io::Write + Send>>,
     reader: Mutex<Box<dyn std::io::Read + Send>>,
+    /// OS process ID, captured at spawn time (avoids locking child mutex).
+    os_pid: std::sync::atomic::AtomicU32,
 }
 
 type PtyHandler = u32;
@@ -76,6 +78,7 @@ async fn spawn<R: Runtime>(
         cmd.env(OsString::from(k), OsString::from(v));
     }
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let os_pid = child.process_id().unwrap_or(0);
     let child_killer = child.clone_killer();
     let handler = state.session_id.fetch_add(1, Ordering::Relaxed);
 
@@ -85,6 +88,7 @@ async fn spawn<R: Runtime>(
         child_killer: Mutex::new(child_killer),
         writer: Mutex::new(writer),
         reader: Mutex::new(reader),
+        os_pid: std::sync::atomic::AtomicU32::new(os_pid),
     });
     state.sessions.write().await.insert(handler, pair);
     Ok(handler)
@@ -203,6 +207,7 @@ async fn exitstatus(pid: PtyHandler, state: tauri::State<'_, PluginState>) -> Re
 }
 
 /// Get the OS process ID of the shell running in a pty session.
+/// Reads from an atomic field set at spawn time — no mutex needed.
 #[tauri::command]
 async fn child_pid(pid: PtyHandler, state: tauri::State<'_, PluginState>) -> Result<u32, String> {
     let session = state
@@ -212,16 +217,42 @@ async fn child_pid(pid: PtyHandler, state: tauri::State<'_, PluginState>) -> Res
         .get(&pid)
         .ok_or("Unavailable pid")?
         .clone();
-    let child = session.child.lock().await;
-    let os_pid = child.process_id().ok_or_else(|| "No process ID available".to_string());
-    os_pid
+    let os_pid = session.os_pid.load(Ordering::Relaxed);
+    if os_pid == 0 {
+        Err("No process ID available".to_string())
+    } else {
+        Ok(os_pid)
+    }
+}
+
+/// Get the foreground process group leader PID of the PTY.
+/// Uses tcgetpgrp on the master fd — the correct way to find
+/// what's running in the foreground of a terminal.
+#[tauri::command]
+async fn foreground_pid(pid: PtyHandler, state: tauri::State<'_, PluginState>) -> Result<u32, String> {
+    let session = state
+        .sessions
+        .read()
+        .await
+        .get(&pid)
+        .ok_or("Unavailable pid")?
+        .clone();
+    let pair = session.pair.lock().await;
+    let fd = pair.master.as_raw_fd()
+        .ok_or("No raw fd available")?;
+    let pgid = unsafe { libc::tcgetpgrp(fd) };
+    if pgid < 0 {
+        Err("tcgetpgrp failed".to_string())
+    } else {
+        Ok(pgid as u32)
+    }
 }
 
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("pty")
         .invoke_handler(tauri::generate_handler![
-            spawn, write, read, resize, kill, exitstatus, child_pid
+            spawn, write, read, resize, kill, exitstatus, child_pid, foreground_pid
         ])
         .setup(|app_handle, _api| {
             app_handle.manage(PluginState::default());

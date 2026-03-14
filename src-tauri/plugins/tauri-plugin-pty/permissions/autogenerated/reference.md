@@ -62,6 +62,32 @@ Denies the exitstatus command without any pre-configured scope.
 <tr>
 <td>
 
+`pty:allow-foreground-pid`
+
+</td>
+<td>
+
+Enables the foreground_pid command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`pty:deny-foreground-pid`
+
+</td>
+<td>
+
+Denies the foreground_pid command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `pty:allow-kill`
 
 </td>

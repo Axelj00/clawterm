@@ -36,6 +36,8 @@ export class Pane {
   readonly element: HTMLDivElement;
   private pty: IPty | null = null;
   ptyPid: number | null = null;
+  /** Internal pty session handle (NOT an OS PID) — used for IPC calls to the plugin */
+  ptyHandle: number | null = null;
   private disposed = false;
   private config: Config;
   readonly analyzer: OutputAnalyzer;
@@ -55,6 +57,8 @@ export class Pane {
   lastFgPid = 0;
   /** Timestamp of the last poll that saw a running (non-idle) process */
   lastRunningAt = 0;
+  /** Timestamp of last data received from the PTY — used to detect idle agents */
+  lastOutputAt = 0;
 
   exitCode: number | null = null;
   onExit: ((exitCode: number) => void) | null = null;
@@ -324,11 +328,13 @@ export class Pane {
       return false;
     }
     // The pty plugin's .pid is an internal session ID (0, 1, 2...), NOT the OS PID.
-    // Wait for the pty to initialize, then fetch the real shell PID.
-    const ptyInit = (this.pty as any)._init as Promise<number> | undefined;
+    // Wait for init, then store the handle and fetch the real shell PID.
+    const ptyObj = this.pty as any;
+    const ptyInit = ptyObj._init as Promise<void> | undefined;
     if (ptyInit) {
-      ptyInit.then((handle) => {
-        return invoke<number>("plugin:pty|child_pid", { pid: handle });
+      ptyInit.then(() => {
+        this.ptyHandle = ptyObj.pid as number;
+        return invoke<number>("plugin:pty|child_pid", { pid: this.ptyHandle });
       }).then((osPid) => {
         this.ptyPid = osPid;
       }).catch((e) => logger.warn("Failed to get shell PID:", e));
@@ -336,6 +342,7 @@ export class Pane {
 
     this.pty.onData((data: Uint8Array | number[]) => {
       if (!this.disposed) {
+        this.lastOutputAt = Date.now();
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
         this.terminal.write(bytes);
         if (this.config.outputAnalysis?.enabled !== false) {

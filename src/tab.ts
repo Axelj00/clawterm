@@ -1,4 +1,5 @@
 import type { Config } from "./config";
+import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout } from "./utils";
 import { type TabState, type PaneState, createDefaultTabState, computeFolderTitle, type TabActivity } from "./tab-state";
 import { type OutputEvent, AGENT_PROCESS_MAP } from "./matchers";
@@ -647,16 +648,10 @@ export class Tab {
   async pollProcessInfo() {
     if (this.pollStopped) return;
 
-    // Debug: log pane PIDs
-    for (const p of this.panes) {
-      const info = p.getProcessInfo();
-      console.warn(`[poll-debug] pane=${p.id} pid=${info.pid} disposed=${info.disposed}`);
-    }
-
     // Poll all panes concurrently
     const polls = this.panes
       .filter((p) => !p.getProcessInfo().disposed && p.getProcessInfo().pid)
-      .map((pane) => this.pollPane(pane).catch((e) => { console.warn(`[poll-debug] pollPane error for ${pane.id}:`, e); }));
+      .map((pane) => this.pollPane(pane).catch(() => {}));
 
     await Promise.all(polls);
 
@@ -675,31 +670,32 @@ export class Tab {
     const timeout = this.config.advanced.ipcTimeoutMs;
 
     try {
-      const procInfo = await invokeWithTimeout<{ name: string; pid: number }>(
-        "get_foreground_process",
-        { pid: shellPid },
-        timeout,
-      );
+      // Use tcgetpgrp via pty plugin to get the foreground process group leader.
+      // This is more reliable than proc_listchildpids for PTY-spawned shells.
+      const fgPgid = pane.ptyHandle != null
+        ? await invoke<number>("plugin:pty|foreground_pid", { pid: pane.ptyHandle }).catch(() => shellPid)
+        : shellPid;
 
-      console.warn(`[poll-debug] pane=${pane.id} shell=${shellPid} fg=${procInfo.pid} name="${procInfo.name}" idle=${procInfo.pid === shellPid}`);
+      // Now get the deepest child of the foreground group leader
+      const procInfo = fgPgid !== shellPid
+        ? await invokeWithTimeout<{ name: string; pid: number }>(
+            "get_foreground_process",
+            { pid: fgPgid },
+            timeout,
+          )
+        : { name: "zsh", pid: shellPid };
 
       const wasIdle = ps.isIdle;
-      const newIsIdle = procInfo.pid === shellPid;
+      const newIsIdle = fgPgid === shellPid;
 
-      // Always use shell PID for CWD — reflects where the user is,
-      // not where the foreground process (agent, server, etc.) cd'd internally.
-      const fgPid = newIsIdle ? shellPid : procInfo.pid;
-      const fgChanged = fgPid !== pane.lastFgPid;
-      pane.lastFgPid = fgPid;
+      // Track foreground PID for agent detection
+      pane.lastFgPid = newIsIdle ? shellPid : procInfo.pid;
 
-      let folder = ps.folderName;
-      let fullCwd = pane.lastFullCwd;
-      if (fgChanged) {
-        [folder, fullCwd] = await Promise.all([
-          invokeWithTimeout<string>("get_process_cwd", { pid: shellPid }, timeout),
-          invokeWithTimeout<string>("get_process_cwd_full", { pid: shellPid }, timeout),
-        ]);
-      }
+      // Always look up shell CWD — it's cheap and the user may have cd'd
+      const [folder, fullCwd] = await Promise.all([
+        invokeWithTimeout<string>("get_process_cwd", { pid: shellPid }, timeout),
+        invokeWithTimeout<string>("get_process_cwd_full", { pid: shellPid }, timeout),
+      ]);
 
       ps.folderName = folder;
       ps.processName = newIsIdle ? "" : procInfo.name;
@@ -713,7 +709,12 @@ export class Tab {
             ps.agentStartedAt = Date.now();
           }
           ps.agentName = agentId;
-          if (ps.activity === "idle") {
+          // If the agent hasn't produced output recently, it's waiting for input.
+          // Otherwise it's actively working (generating, running tools, etc.)
+          const agentOutputAge = Date.now() - pane.lastOutputAt;
+          if (agentOutputAge > 3000) {
+            ps.activity = "agent-waiting";
+          } else if (ps.activity === "idle") {
             ps.activity = "running";
           }
         } else if (ps.activity !== "server-running" && ps.activity !== "error") {
@@ -739,21 +740,15 @@ export class Tab {
 
       if (fullCwd && fullCwd !== pane.lastFullCwd) {
         pane.lastFullCwd = fullCwd;
-        // Get project/git info for the first pane (determines tab title)
-        // and for the focused pane (determines git branch in status bar)
-        const isFirst = pane === this.panes[0];
-        if (isFirst || pane === this.focusedPane) {
+        // Get project/git info for the focused pane (determines tab title)
+        if (pane === this.focusedPane) {
           try {
             const [projectName, gitBranch] = await Promise.all([
               invokeWithTimeout<string>("get_project_info", { dir: fullCwd }, timeout),
               invokeWithTimeout<string>("get_git_branch", { dir: fullCwd }, timeout),
             ]);
-            if (isFirst) {
-              this.state.projectName = projectName || null;
-            }
-            if (pane === this.focusedPane) {
-              this.state.gitBranch = gitBranch || null;
-            }
+            this.state.projectName = projectName || null;
+            this.state.gitBranch = gitBranch || null;
           } catch (e) {
             logger.debug("Failed to get project/git info:", e);
           }
@@ -778,9 +773,8 @@ export class Tab {
   private deriveTabState() {
     const fps = this.focusedPane.state;
 
-    // Tab folder = first pane's (stable, doesn't change with focus)
-    const firstPane = this.panes[0];
-    this.state.folderName = firstPane ? firstPane.state.folderName : fps.folderName;
+    // Tab folder = focused pane's (follows the user)
+    this.state.folderName = fps.folderName;
     this.state.processName = fps.processName;
     this.state.isIdle = fps.isIdle;
 
