@@ -675,20 +675,23 @@ export class Tab {
         timeout,
       );
 
+      logger.debug(`[poll] pane shell=${shellPid} fg=${procInfo.pid} name="${procInfo.name}" idle=${procInfo.pid === shellPid}`);
+
       const wasIdle = ps.isIdle;
       const newIsIdle = procInfo.pid === shellPid;
 
-      // CWD lookup optimization — skip if foreground PID unchanged
-      const cwdPid = newIsIdle ? shellPid : procInfo.pid;
-      const pidChanged = cwdPid !== pane.lastFgPid;
-      pane.lastFgPid = cwdPid;
+      // Always use shell PID for CWD — reflects where the user is,
+      // not where the foreground process (agent, server, etc.) cd'd internally.
+      const fgPid = newIsIdle ? shellPid : procInfo.pid;
+      const fgChanged = fgPid !== pane.lastFgPid;
+      pane.lastFgPid = fgPid;
 
       let folder = ps.folderName;
       let fullCwd = pane.lastFullCwd;
-      if (pidChanged) {
+      if (fgChanged) {
         [folder, fullCwd] = await Promise.all([
-          invokeWithTimeout<string>("get_process_cwd", { pid: cwdPid }, timeout),
-          invokeWithTimeout<string>("get_process_cwd_full", { pid: cwdPid }, timeout),
+          invokeWithTimeout<string>("get_process_cwd", { pid: shellPid }, timeout),
+          invokeWithTimeout<string>("get_process_cwd_full", { pid: shellPid }, timeout),
         ]);
       }
 
@@ -730,20 +733,20 @@ export class Tab {
 
       if (fullCwd && fullCwd !== pane.lastFullCwd) {
         pane.lastFullCwd = fullCwd;
-        // Get project/git info — always look up for focused pane,
-        // and for other panes if we don't have a project name yet
-        if (pane === this.focusedPane || !this.state.projectName) {
+        // Get project/git info for the first pane (determines tab title)
+        // and for the focused pane (determines git branch in status bar)
+        const isFirst = pane === this.panes[0];
+        if (isFirst || pane === this.focusedPane) {
           try {
             const [projectName, gitBranch] = await Promise.all([
               invokeWithTimeout<string>("get_project_info", { dir: fullCwd }, timeout),
               invokeWithTimeout<string>("get_git_branch", { dir: fullCwd }, timeout),
             ]);
-            if (pane === this.focusedPane) {
+            if (isFirst) {
               this.state.projectName = projectName || null;
+            }
+            if (pane === this.focusedPane) {
               this.state.gitBranch = gitBranch || null;
-            } else if (!this.state.projectName && projectName) {
-              // Use non-focused pane's project name as fallback
-              this.state.projectName = projectName;
             }
           } catch (e) {
             logger.debug("Failed to get project/git info:", e);
@@ -769,8 +772,9 @@ export class Tab {
   private deriveTabState() {
     const fps = this.focusedPane.state;
 
-    // Tab folder/process = focused pane's
-    this.state.folderName = fps.folderName;
+    // Tab folder = first pane's (stable, doesn't change with focus)
+    const firstPane = this.panes[0];
+    this.state.folderName = firstPane ? firstPane.state.folderName : fps.folderName;
     this.state.processName = fps.processName;
     this.state.isIdle = fps.isIdle;
 

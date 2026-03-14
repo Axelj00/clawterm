@@ -179,7 +179,9 @@ mod platform {
         let mut current_pid = pid;
         let mut current_name = get_proc_name(pid).unwrap_or_default();
 
-        // Track the last known agent we passed through during the walk
+        // Track the last known agent we passed through during the walk.
+        // This catches both native agents (claude, codex binaries) and
+        // script-based agents (gemini as node script) at any tree depth.
         let mut agent_pid: Option<u32> = None;
         let mut agent_name: Option<String> = None;
 
@@ -194,24 +196,30 @@ mod platform {
             current_name = get_proc_name(child_pid).unwrap_or_default();
             current_pid = child_pid;
 
-            // Remember if this is a known agent
-            if is_known_agent(&current_name) {
+            // Check for known agent — either by binary name or by
+            // inspecting args for script-based agents (node, python, etc.)
+            let mut resolved_name = current_name.clone();
+            if matches!(resolved_name.as_str(), "node" | "python" | "python3" | "ruby") {
+                if let Some(friendly) = friendly_name_from_args(current_pid) {
+                    resolved_name = friendly;
+                }
+            }
+            if is_known_agent(&resolved_name) {
                 agent_pid = Some(current_pid);
-                agent_name = Some(current_name.clone());
+                agent_name = Some(resolved_name);
             }
         }
 
-        // If the process name is a runtime (node, python, etc.), check
-        // the command-line args for a more descriptive program name.
+        // Resolve final process name for script-based tools at the leaf
         if matches!(current_name.as_str(), "node" | "python" | "python3" | "ruby") {
             if let Some(friendly) = friendly_name_from_args(current_pid) {
                 current_name = friendly;
             }
         }
 
-        // If the deepest child is a shell/generic process but we passed through
-        // a known agent, report the agent instead. This handles agents that spawn
-        // subshells for tool execution (e.g. claude → zsh → command).
+        // If the deepest child is not an agent but we passed through one,
+        // return the agent. Handles agents that spawn subshells/helpers
+        // (e.g. claude → zsh, gemini(node) → child workers).
         if !is_known_agent(&current_name) {
             if let (Some(ap), Some(an)) = (agent_pid, agent_name) {
                 return Ok(ProcessInfo { name: an, pid: ap });
