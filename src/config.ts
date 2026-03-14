@@ -84,6 +84,7 @@ export interface Config {
     zoomIn: string;
     zoomOut: string;
     zoomReset: string;
+    restoreTab: string;
     [key: string]: string;
   };
   quickCommands: Record<string, string>;
@@ -187,6 +188,7 @@ const DEFAULT_CONFIG: Config = {
     zoomIn: `${modKey}+=`,
     zoomOut: `${modKey}+-`,
     zoomReset: `${modKey}+0`,
+    restoreTab: `${modKey}+shift+t`,
   },
   quickCommands: {
     [`${modKey}+shift+c`]: "claude --dangerously-skip-permissions\n",

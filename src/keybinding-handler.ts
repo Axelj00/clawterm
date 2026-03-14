@@ -24,6 +24,7 @@ export interface KeybindingActions {
   zoomIn(): void;
   zoomOut(): void;
   zoomReset(): void;
+  restoreClosedTab(): void;
 }
 
 /**
@@ -138,6 +139,12 @@ export function createKeyHandler(
     if (matchesKeybinding(e, kb.zoomReset)) {
       e.preventDefault();
       actions.zoomReset();
+      return false;
+    }
+
+    if (matchesKeybinding(e, kb.restoreTab)) {
+      e.preventDefault();
+      actions.restoreClosedTab();
       return false;
     }
 

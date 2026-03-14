@@ -46,6 +46,7 @@ export class TerminalManager {
   private shortcutsPanelEl: HTMLDivElement | null = null;
   private creatingTab = false;
   private handleKey!: (e: KeyboardEvent) => boolean;
+  private closedTabStack: { cwd: string; title?: string }[] = [];
 
   async init() {
     this.config = await loadConfig();
@@ -94,6 +95,7 @@ export class TerminalManager {
       zoomIn: () => this.adjustFontSize(1),
       zoomOut: () => this.adjustFontSize(-1),
       zoomReset: () => this.resetFontSize(),
+      restoreClosedTab: () => this.restoreClosedTab(),
     });
 
     this.renderShell();
@@ -559,6 +561,12 @@ export class TerminalManager {
           if (this.activeTabId) this.closeTab(this.activeTabId);
         },
       },
+      {
+        id: "restore-tab",
+        label: "Restore Closed Tab",
+        category: "Tabs",
+        action: () => this.restoreClosedTab(),
+      },
       { id: "next-tab", label: "Next Tab", category: "Tabs", action: () => this.nextTab() },
       { id: "prev-tab", label: "Previous Tab", category: "Tabs", action: () => this.prevTab() },
       {
@@ -691,6 +699,13 @@ export class TerminalManager {
     const tab = this.tabs.get(id);
     if (!tab) return;
 
+    // Save CWD for restore-closed-tab feature (keep last 10)
+    const cwd = tab.lastFullCwd;
+    if (cwd) {
+      this.closedTabStack.push({ cwd, title: tab.manualTitle ?? undefined });
+      if (this.closedTabStack.length > 10) this.closedTabStack.shift();
+    }
+
     this.serverTracker.removeServer(id);
     tab.dispose();
     this.tabs.delete(id);
@@ -709,6 +724,15 @@ export class TerminalManager {
     this.renderTabList();
     this.updateStatusBar();
     this.persistSession();
+  }
+
+  private restoreClosedTab() {
+    const entry = this.closedTabStack.pop();
+    if (!entry) {
+      showToast("No recently closed tabs", "warn", 2000);
+      return;
+    }
+    this.createTab(entry.cwd);
   }
 
   private showCloseConfirm(tabId: string, processName: string) {

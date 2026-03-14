@@ -32,6 +32,7 @@ function buildGroups(config: Config): ShortcutGroup[] {
         { label: "Next tab", binding: kb.nextTab },
         { label: "Previous tab", binding: kb.prevTab },
         { label: "Quick switch", binding: kb.quickSwitch },
+        { label: "Restore closed tab", binding: kb.restoreTab },
       ],
     },
     {
