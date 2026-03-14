@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-03-14
+
+### Fixed
+- Split pane crash leaving app in broken state — handle PTY spawn failure with rollback (#67)
+- Unhandled promise rejections from split operations — properly await and catch errors (#67)
+- fitAddon.fit() crash on zero-dimension elements in Pane.start() (#67)
+- Cascading dispose failures — one pane failing to dispose no longer blocks the rest (#67)
+
 ## [0.5.2] - 2026-03-14
 
 ### Fixed
@@ -167,7 +175,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/Axelj00/clawterm/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/Axelj00/clawterm/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/Axelj00/clawterm/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/Axelj00/clawterm/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Axelj00/clawterm/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Axelj00/clawterm/compare/v0.4.1...v0.5.0
