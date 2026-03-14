@@ -40,6 +40,8 @@ export class Pane {
   lastFullCwd: string | null = null;
   private scrollPill: HTMLDivElement | null = null;
   private isScrolledUp = false;
+  private readonly ac = new AbortController();
+  private readonly disposables: { dispose(): void }[] = [];
 
   exitCode: number | null = null;
   onExit: ((exitCode: number) => void) | null = null;
@@ -155,51 +157,55 @@ export class Pane {
     this.element.className = "pane";
 
     // Fire onFocus when this pane's element receives focus (click/tab)
-    this.element.addEventListener("focusin", () => {
-      this.onFocus?.();
-    });
+    this.element.addEventListener("focusin", () => this.onFocus?.(), { signal: this.ac.signal });
 
     // Copy selection to clipboard on select
     if (config.copyOnSelect) {
-      this.terminal.onSelectionChange(() => {
-        const selection = this.terminal.getSelection();
-        if (selection) {
-          navigator.clipboard.writeText(selection).catch(() => {});
-        }
-      });
+      this.disposables.push(
+        this.terminal.onSelectionChange(() => {
+          const selection = this.terminal.getSelection();
+          if (selection) {
+            navigator.clipboard.writeText(selection).catch(() => {});
+          }
+        }),
+      );
     }
 
     // Right-click context menu with Copy / Paste
-    this.element.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      const selection = this.terminal.getSelection();
-      showContextMenu(e.clientX, e.clientY, [
-        {
-          label: "Copy",
-          disabled: !selection,
-          action: () => {
-            if (selection) navigator.clipboard.writeText(selection).catch(() => {});
+    this.element.addEventListener(
+      "contextmenu",
+      (e: MouseEvent) => {
+        e.preventDefault();
+        const selection = this.terminal.getSelection();
+        showContextMenu(e.clientX, e.clientY, [
+          {
+            label: "Copy",
+            disabled: !selection,
+            action: () => {
+              if (selection) navigator.clipboard.writeText(selection).catch(() => {});
+            },
           },
-        },
-        {
-          label: "Paste",
-          separator: true,
-          action: () => {
-            navigator.clipboard
-              .readText()
-              .then((text) => {
-                if (text && !this.disposed) this.terminal.paste(text);
-              })
-              .catch(() => {});
+          {
+            label: "Paste",
+            separator: true,
+            action: () => {
+              navigator.clipboard
+                .readText()
+                .then((text) => {
+                  if (text && !this.disposed) this.terminal.paste(text);
+                })
+                .catch(() => {});
+            },
           },
-        },
-        {
-          label: "Clear",
-          separator: true,
-          action: () => this.terminal.clear(),
-        },
-      ]);
-    });
+          {
+            label: "Clear",
+            separator: true,
+            action: () => this.terminal.clear(),
+          },
+        ]);
+      },
+      { signal: this.ac.signal },
+    );
 
     // Wire output analyzer events
     if (config.outputAnalysis?.enabled !== false) {
@@ -281,27 +287,30 @@ export class Pane {
       }
     });
 
-    this.terminal.onData((data: string) => {
-      if (this.pty && !this.disposed) {
-        this.pty.write(data);
-      }
-    });
-
-    this.terminal.onResize(({ cols, rows }) => {
-      if (this.pty && !this.disposed) {
-        this.pty.resize(cols, rows);
-      }
-    });
+    this.disposables.push(
+      this.terminal.onData((data: string) => {
+        if (this.pty && !this.disposed) {
+          this.pty.write(data);
+        }
+      }),
+      this.terminal.onResize(({ cols, rows }) => {
+        if (this.pty && !this.disposed) {
+          this.pty.resize(cols, rows);
+        }
+      }),
+    );
 
     this.searchBar = new SearchBar(this.element, this.searchAddon, () => this.terminal.focus());
 
     // Track scroll position to show "new output" pill
-    this.terminal.onScroll(() => {
-      const buf = this.terminal.buffer.active;
-      const atBottom = buf.viewportY >= buf.baseY;
-      this.isScrolledUp = !atBottom;
-      if (atBottom) this.hideScrollPill();
-    });
+    this.disposables.push(
+      this.terminal.onScroll(() => {
+        const buf = this.terminal.buffer.active;
+        const atBottom = buf.viewportY >= buf.baseY;
+        this.isScrolledUp = !atBottom;
+        if (atBottom) this.hideScrollPill();
+      }),
+    );
 
     return true;
   }
@@ -373,6 +382,11 @@ export class Pane {
 
   dispose() {
     this.disposed = true;
+    // Remove all DOM event listeners registered with AbortController
+    this.ac.abort();
+    // Dispose all xterm event subscriptions
+    for (const d of this.disposables) d.dispose();
+    this.disposables.length = 0;
     // Capture and null PTY ref before kill to prevent double-dispose
     // and block any further writes from terminal.onData / onResize
     const pty = this.pty;
