@@ -17,32 +17,38 @@ describe("OutputAnalyzer", () => {
 
   it("detects server-started pattern", () => {
     analyzer.feed(toBytes("Server listening on http://localhost:3000\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("server-started");
   });
 
   it("detects agent-waiting pattern", () => {
     analyzer.feed(toBytes("Do you want to proceed? [Y/n]\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("agent-waiting");
   });
 
   it("detects error patterns", () => {
     analyzer.feed(toBytes("FATAL: something went wrong\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("error");
   });
 
   it("respects cooldown", () => {
     analyzer.feed(toBytes("Do you want to proceed? [Y/n]\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
     // Feed same pattern immediately - should be suppressed by cooldown
     analyzer.feed(toBytes("Do you want to proceed? [Y/n]\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
   });
 
   it("strips ANSI codes before matching", () => {
     analyzer.feed(toBytes("\x1b[32mServer listening on http://localhost:8080\x1b[0m\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("server-started");
   });
@@ -58,8 +64,10 @@ describe("OutputAnalyzer", () => {
   it("detects patterns across chunk boundaries", () => {
     // Split "localhost:3000" across two chunks
     analyzer.feed(toBytes("Server listening on http://local"));
+    analyzer.flush();
     expect(events.length).toBe(0);
     analyzer.feed(toBytes("host:3000\n"));
+    analyzer.flush();
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("server-started");
   });

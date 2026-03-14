@@ -3,6 +3,12 @@ import { type OutputEvent, type OutputMatcher, DEFAULT_MATCHERS } from "./matche
 // prettier-ignore
 const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-B]|\x1b[\x20-\x2f][\x40-\x7e]|\x08/g; // eslint-disable-line no-control-regex
 
+/** Reuse a single TextDecoder to avoid per-chunk allocation */
+const decoder = new TextDecoder();
+
+/** Debounce interval for regex matching (ms) */
+const MATCH_DEBOUNCE_MS = 100;
+
 export class OutputAnalyzer {
   private buffer = "";
   private readonly bufferSize: number;
@@ -10,6 +16,10 @@ export class OutputAnalyzer {
   private lastFired: Map<string, number> = new Map();
   private overlapWindow = "";
   private listener: ((event: OutputEvent) => void) | null = null;
+
+  /** Pending text accumulated between debounced match runs */
+  private pendingText = "";
+  private matchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(bufferSize = 4096, customMatchers?: OutputMatcher[]) {
     this.bufferSize = bufferSize;
@@ -21,7 +31,7 @@ export class OutputAnalyzer {
   }
 
   feed(data: Uint8Array) {
-    const text = new TextDecoder().decode(data);
+    const text = decoder.decode(data, { stream: true });
     const clean = text.replace(ANSI_RE, "");
 
     // Append to rolling buffer, truncate from front
@@ -29,6 +39,18 @@ export class OutputAnalyzer {
     if (this.buffer.length > this.bufferSize) {
       this.buffer = this.buffer.slice(this.buffer.length - this.bufferSize);
     }
+
+    // Accumulate text and debounce regex matching
+    this.pendingText += clean;
+    if (!this.matchTimer) {
+      this.matchTimer = setTimeout(() => this.runMatchers(), MATCH_DEBOUNCE_MS);
+    }
+  }
+
+  private runMatchers() {
+    this.matchTimer = null;
+    const clean = this.pendingText;
+    this.pendingText = "";
 
     // Match against chunk + overlap from previous chunk (catches split patterns)
     // Cap length to prevent regex backtracking on large output bursts
@@ -57,13 +79,29 @@ export class OutputAnalyzer {
     this.overlapWindow = clean.length >= 256 ? clean.slice(-256) : (this.overlapWindow + clean).slice(-256);
   }
 
+  /** Force-run any pending matchers immediately (useful for tests). */
+  flush() {
+    if (this.matchTimer) {
+      clearTimeout(this.matchTimer);
+      this.matchTimer = null;
+    }
+    if (this.pendingText) {
+      this.runMatchers();
+    }
+  }
+
   getBuffer(): string {
     return this.buffer;
   }
 
   dispose() {
+    if (this.matchTimer) {
+      clearTimeout(this.matchTimer);
+      this.matchTimer = null;
+    }
     this.listener = null;
     this.buffer = "";
+    this.pendingText = "";
     this.overlapWindow = "";
     this.lastFired.clear();
   }
