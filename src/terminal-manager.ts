@@ -49,6 +49,8 @@ export class TerminalManager {
   private quitting = false;
   private handleKey!: (e: KeyboardEvent) => boolean;
   private closedTabStack: { cwd: string; title?: string }[] = [];
+  /** AbortController for document-level event listeners — aborted on dispose */
+  private readonly ac = new AbortController();
 
   async init() {
     this.config = await loadConfig();
@@ -352,7 +354,7 @@ export class TerminalManager {
       const width = isRight ? window.innerWidth - e.clientX : e.clientX;
       const clamped = Math.min(600, Math.max(100, width));
       document.documentElement.style.setProperty("--sidebar-width", `${clamped}px`);
-    });
+    }, { signal: this.ac.signal });
 
     document.addEventListener("mouseup", () => {
       if (!dragging) return;
@@ -374,7 +376,7 @@ export class TerminalManager {
         const tab = this.tabs.get(this.activeTabId);
         tab?.fit();
       }
-    });
+    }, { signal: this.ac.signal });
   }
 
   async createTab(restoreCwd?: string, startupCommand?: string) {
@@ -1191,6 +1193,8 @@ export class TerminalManager {
 
   dispose() {
     this.quitting = true;
+    // Remove all document-level event listeners registered with AbortController
+    this.ac.abort();
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
