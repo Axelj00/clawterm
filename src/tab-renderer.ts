@@ -1,5 +1,6 @@
 import type { Tab } from "./tab";
 import { ACTIVITY_ICONS, computeSubtitle, type TabState } from "./tab-state";
+import { AGENT_COLORS } from "./matchers";
 import { modLabel } from "./utils";
 
 // Pre-parse SVG icons once at module load
@@ -13,6 +14,7 @@ const PARSED_ICONS: Record<string, HTMLElement> = {};
 }
 
 interface ChildRefs {
+  indicator: HTMLElement;
   icon: HTMLElement;
   title: HTMLElement;
   sub: HTMLElement;
@@ -83,6 +85,15 @@ export class TabRenderer {
         if (svgClone) refs.icon.appendChild(svgClone);
       }
 
+      // Update agent color indicator
+      const agentColor = tab.state.agentName ? (AGENT_COLORS[tab.state.agentName] ?? null) : null;
+      if (agentColor) {
+        refs.indicator.style.background = agentColor;
+        refs.indicator.style.display = "";
+      } else {
+        refs.indicator.style.display = "none";
+      }
+
       // Update title
       if (refs.title.textContent !== tab.title) {
         refs.title.textContent = tab.title;
@@ -116,6 +127,10 @@ export class TabRenderer {
     entry.setAttribute("data-id", id);
     entry.setAttribute("role", "tab");
 
+    const indicator = document.createElement("span");
+    indicator.className = "tab-agent-indicator";
+    indicator.style.display = "none";
+
     const icon = document.createElement("span");
     icon.className = "tab-icon";
     icon.setAttribute("data-role", "icon");
@@ -142,6 +157,7 @@ export class TabRenderer {
       this.actions.closeTab(id);
     });
 
+    entry.appendChild(indicator);
     entry.appendChild(icon);
     entry.appendChild(titleWrap);
     entry.appendChild(hint);
@@ -191,7 +207,7 @@ export class TabRenderer {
     });
 
     this.tabElements.set(id, entry);
-    this.tabChildRefs.set(id, { icon, title, sub, hint });
+    this.tabChildRefs.set(id, { indicator, icon, title, sub, hint });
     list.appendChild(entry);
 
     return entry;

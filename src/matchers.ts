@@ -23,6 +23,14 @@ export const AGENT_PROCESS_MAP: Record<string, string> = {
   cursor: "cursor",
 };
 
+// Agent-specific accent colors for sidebar indicators
+export const AGENT_COLORS: Record<string, string> = {
+  claude: "#ff9f0a",
+  aider: "#30d158",
+  copilot: "#bf5af2",
+  cursor: "#0a84ff",
+};
+
 function extractValidPort(m: RegExpMatchArray, group = 1): Partial<OutputEvent> {
   const port = parseInt(m[group], 10);
   if (port < 1 || port > 65535) return {};
