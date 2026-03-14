@@ -240,8 +240,9 @@ export class TabRenderer {
     const parts: string[] = [];
     for (const [id, tab] of tabs) {
       const s = tab.state;
+      const subtitle = computeSubtitle(s) ?? "";
       parts.push(
-        `${id}|${tab.title}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}|${s.gitBranch}`,
+        `${id}|${tab.title}|${subtitle}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}|${s.gitBranch}|${s.folderName}|${s.processName}`,
       );
     }
     parts.push(`active:${activeTabId}`);

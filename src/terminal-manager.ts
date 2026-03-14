@@ -3,7 +3,7 @@ import { loadConfig, applyThemeToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout, trapFocus } from "./utils";
-import { computeSubtitle } from "./tab-state";
+import { computeDisplayTitle, createDefaultTabState, computeSubtitle } from "./tab-state";
 import { NotificationManager } from "./notifications";
 import { ServerTracker } from "./server-tracker";
 import { showContextMenu, type ContextMenuItem } from "./context-menu";
@@ -393,7 +393,7 @@ export class TerminalManager {
 
     this.tabCounter++;
     const id = `tab-${this.tabCounter}`;
-    const title = `Terminal ${this.tabCounter}`;
+    const title = computeDisplayTitle(createDefaultTabState());
 
     // Use restored CWD, or inherit from active tab
     let cwd: string | undefined = restoreCwd;
@@ -455,6 +455,13 @@ export class TerminalManager {
 
     // Extra focus after a frame to ensure terminal is interactive
     requestAnimationFrame(() => tab.focus());
+
+    // Immediately poll process info so the tab title updates ASAP
+    // (don't wait for the next interval tick)
+    tab.pollProcessInfo().then(() => {
+      this.renderTabList();
+      this.updateStatusBar();
+    }).catch(() => {});
 
     // Send startup command after a brief delay for shell init
     if (startupCommand) {
