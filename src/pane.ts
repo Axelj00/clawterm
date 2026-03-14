@@ -1,6 +1,7 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -149,7 +150,11 @@ export class Pane {
     this.searchAddon = new SearchAddon();
     const unicodeAddon = new Unicode11Addon();
     this.terminal.loadAddon(this.fitAddon);
-    this.terminal.loadAddon(new WebLinksAddon());
+    this.terminal.loadAddon(
+      new WebLinksAddon((_event, uri) => {
+        openUrl(uri).catch((e) => logger.debug("Failed to open URL:", e));
+      }),
+    );
     this.terminal.loadAddon(this.searchAddon);
     this.terminal.loadAddon(unicodeAddon);
     this.terminal.unicode.activeVersion = "11";
