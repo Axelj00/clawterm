@@ -20,11 +20,14 @@ We use [semver](https://semver.org/): patch for bug fixes, minor for features, m
   - Update `[Unreleased]` link to compare from new version
 - [ ] Format code: `npm run format`
 - [ ] Commit: `git commit -m "Bump version to X.Y.Z"`
-- [ ] Verify the final commit passes all checks (this is what CI will run on the tag):
+- [ ] **Verify the final commit passes all checks locally before tagging.**
+  The release workflow runs these same checks on the tagged commit — if they
+  fail the build is skipped and no binaries or `latest.json` are published,
+  which means the auto-updater will silently not prompt users:
   ```bash
   npm run lint && npm run format:check && npm run test && npx tsc --noEmit
   ```
-- [ ] Tag and push:
+- [ ] Only after checks pass, tag and push:
   ```bash
   git tag vX.Y.Z
   git push origin main --tags

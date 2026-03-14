@@ -58,4 +58,13 @@ for (const file of FILES) {
   }
 }
 
-console.log(`\nDone. To finish the release:\n  git add -A && git commit -m "Bump version to ${next}"\n  git tag v${next}\n  git push origin main --tags`);
+console.log(`\nDone. To finish the release:
+
+  git add -A && git commit -m "Bump version to ${next}"
+
+  # Verify checks pass BEFORE tagging (CI runs these on the tag):
+  npm run lint && npm run format:check && npm run test && npx tsc --noEmit
+
+  # Only tag and push after checks pass:
+  git tag v${next}
+  git push origin main --tags`);
