@@ -81,6 +81,9 @@ export interface Config {
     focusNextPane: string;
     focusPrevPane: string;
     commandPalette: string;
+    zoomIn: string;
+    zoomOut: string;
+    zoomReset: string;
     [key: string]: string;
   };
   quickCommands: Record<string, string>;
@@ -181,6 +184,9 @@ const DEFAULT_CONFIG: Config = {
     focusNextPane: `${modKey}+]`,
     focusPrevPane: `${modKey}+[`,
     commandPalette: `${modKey}+shift+p`,
+    zoomIn: `${modKey}+=`,
+    zoomOut: `${modKey}+-`,
+    zoomReset: `${modKey}+0`,
   },
   quickCommands: {
     [`${modKey}+shift+c`]: "claude --dangerously-skip-permissions\n",

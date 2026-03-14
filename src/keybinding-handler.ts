@@ -21,6 +21,9 @@ export interface KeybindingActions {
   focusPrevPane(): void;
   switchToTabIndex(index: number): void;
   writeToActivePty(text: string): void;
+  zoomIn(): void;
+  zoomOut(): void;
+  zoomReset(): void;
 }
 
 /**
@@ -117,6 +120,24 @@ export function createKeyHandler(
     if (matchesKeybinding(e, kb.focusPrevPane)) {
       e.preventDefault();
       actions.focusPrevPane();
+      return false;
+    }
+
+    if (matchesKeybinding(e, kb.zoomIn)) {
+      e.preventDefault();
+      actions.zoomIn();
+      return false;
+    }
+
+    if (matchesKeybinding(e, kb.zoomOut)) {
+      e.preventDefault();
+      actions.zoomOut();
+      return false;
+    }
+
+    if (matchesKeybinding(e, kb.zoomReset)) {
+      e.preventDefault();
+      actions.zoomReset();
       return false;
     }
 

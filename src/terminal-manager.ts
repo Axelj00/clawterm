@@ -91,6 +91,9 @@ export class TerminalManager {
         if (index < ids.length) this.switchToTab(ids[index]);
       },
       writeToActivePty: (text) => this.writeToActivePty(text),
+      zoomIn: () => this.adjustFontSize(1),
+      zoomOut: () => this.adjustFontSize(-1),
+      zoomReset: () => this.resetFontSize(),
     });
 
     this.renderShell();
@@ -589,6 +592,9 @@ export class TerminalManager {
         category: "Terminal",
         action: () => this.reloadConfig(),
       },
+      { id: "zoom-in", label: "Zoom In", category: "Terminal", action: () => this.adjustFontSize(1) },
+      { id: "zoom-out", label: "Zoom Out", category: "Terminal", action: () => this.adjustFontSize(-1) },
+      { id: "zoom-reset", label: "Reset Zoom", category: "Terminal", action: () => this.resetFontSize() },
       {
         id: "shortcuts",
         label: "Keyboard Shortcuts",
@@ -951,6 +957,29 @@ export class TerminalManager {
   private updateStatusBar() {
     const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
     this.tabRenderer.updateStatusBar(tab?.state ?? null);
+  }
+
+  private adjustFontSize(delta: number) {
+    const current = this.config.font.size;
+    const newSize = Math.max(8, Math.min(32, current + delta));
+    if (newSize === current) return;
+    this.config.font.size = newSize;
+    for (const tab of this.tabs.values()) {
+      tab.applyConfig(this.config);
+    }
+    invoke("write_config", { contents: JSON.stringify(this.config, null, 2) }).catch(() => {
+      showToast("Couldn't save font size", "warn");
+    });
+  }
+
+  private resetFontSize() {
+    this.config.font.size = 14; // default
+    for (const tab of this.tabs.values()) {
+      tab.applyConfig(this.config);
+    }
+    invoke("write_config", { contents: JSON.stringify(this.config, null, 2) }).catch(() => {
+      showToast("Couldn't save font size", "warn");
+    });
   }
 
   private async reloadConfig() {

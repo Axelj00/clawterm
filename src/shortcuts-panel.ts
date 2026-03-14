@@ -49,6 +49,9 @@ function buildGroups(config: Config): ShortcutGroup[] {
       entries: [
         { label: "Command palette", binding: kb.commandPalette },
         { label: "Search", binding: kb.search },
+        { label: "Zoom in", binding: kb.zoomIn },
+        { label: "Zoom out", binding: kb.zoomOut },
+        { label: "Reset zoom", binding: kb.zoomReset },
         { label: "Reload config", binding: kb.reloadConfig },
         { label: "Cycle attention tabs", binding: kb.cycleAttention },
       ],
