@@ -1,9 +1,9 @@
 import { Tab } from "./tab";
-import { loadConfig, matchesKeybinding, applyThemeToCSS, type Config } from "./config";
+import { loadConfig, applyThemeToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout, trapFocus } from "./utils";
-import { ACTIVITY_ICONS, computeSubtitle } from "./tab-state";
+import { computeSubtitle } from "./tab-state";
 import { NotificationManager } from "./notifications";
 import { ServerTracker } from "./server-tracker";
 import { showContextMenu, type ContextMenuItem } from "./context-menu";
@@ -11,10 +11,11 @@ import { TabSwitcher, type SwitcherTab } from "./tab-switcher";
 import type { OutputEvent } from "./matchers";
 import { logger } from "./logger";
 import { showToast } from "./toast";
-import { modLabel } from "./utils";
 import { loadSession, saveSession, type SessionTab } from "./session";
 import { createShortcutsPanel } from "./shortcuts-panel";
 import { showCommandPalette, type PaletteCommand } from "./command-palette";
+import { createKeyHandler } from "./keybinding-handler";
+import { TabRenderer } from "./tab-renderer";
 
 function el(tag: string, attrs?: Record<string, string>, ...children: (HTMLElement | string)[]): HTMLElement {
   const e = document.createElement(tag);
@@ -27,15 +28,6 @@ function el(tag: string, attrs?: Record<string, string>, ...children: (HTMLEleme
   return e;
 }
 
-const PARSED_ICONS: Record<string, HTMLElement> = {};
-{
-  const parser = new DOMParser();
-  for (const [key, info] of Object.entries(ACTIVITY_ICONS)) {
-    const doc = parser.parseFromString(info.svg, "image/svg+xml");
-    PARSED_ICONS[key] = doc.documentElement as unknown as HTMLElement;
-  }
-}
-
 export class TerminalManager {
   private tabs: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
@@ -44,20 +36,16 @@ export class TerminalManager {
   private notifications!: NotificationManager;
   private serverTracker!: ServerTracker;
   private tabSwitcher = new TabSwitcher();
+  private tabRenderer!: TabRenderer;
   private resizeObserver: ResizeObserver | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private unlistenFocus: (() => void) | null = null;
   private lastBackgroundPoll = 0;
-  private dragTabId: string | null = null;
-  private tabElements: Map<string, HTMLElement> = new Map();
-  private tabChildRefs: Map<
-    string,
-    { icon: HTMLElement; title: HTMLElement; sub: HTMLElement; hint: HTMLElement }
-  > = new Map();
   private lastTabSnapshot = "";
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
   private shortcutsPanelEl: HTMLDivElement | null = null;
   private creatingTab = false;
+  private handleKey!: (e: KeyboardEvent) => boolean;
 
   async init() {
     this.config = await loadConfig();
@@ -67,6 +55,44 @@ export class TerminalManager {
       this.config.advanced.ipcTimeoutMs,
     );
     applyThemeToCSS(this.config);
+
+    this.tabRenderer = new TabRenderer({
+      closeTab: (id) => this.closeTab(id),
+      switchToTab: (id) => this.switchToTab(id),
+      showTabContextMenu: (e, id) => this.showTabContextMenu(e, id),
+      reorderTab: (dragId, targetId, insertBefore) => this.reorderTab(dragId, targetId, insertBefore),
+    });
+
+    this.handleKey = createKeyHandler(() => this.config, {
+      createTab: () => this.createTab(),
+      closeActiveTab: () => {
+        if (this.activeTabId) this.closeTab(this.activeTabId);
+      },
+      nextTab: () => this.nextTab(),
+      prevTab: () => this.prevTab(),
+      reloadConfig: () => this.reloadConfig(),
+      cycleAttentionTabs: () => this.cycleAttentionTabs(),
+      toggleSearch: () => {
+        if (this.activeTabId) this.tabs.get(this.activeTabId)?.toggleSearch();
+      },
+      showQuickSwitch: () => this.showQuickSwitch(),
+      openCommandPalette: () => this.openCommandPalette(),
+      splitHorizontal: () => this.splitActiveTab("horizontal"),
+      splitVertical: () => this.splitActiveTab("vertical"),
+      closeActivePane: () => this.closeActivePane(),
+      focusNextPane: () => {
+        if (this.activeTabId) this.tabs.get(this.activeTabId)?.focusNextPane();
+      },
+      focusPrevPane: () => {
+        if (this.activeTabId) this.tabs.get(this.activeTabId)?.focusPrevPane();
+      },
+      switchToTabIndex: (index) => {
+        const ids = Array.from(this.tabs.keys());
+        if (index < ids.length) this.switchToTab(ids[index]);
+      },
+      writeToActivePty: (text) => this.writeToActivePty(text),
+    });
+
     this.renderShell();
     this.setupResize();
     this.setupServerTracker();
@@ -286,129 +312,6 @@ export class TerminalManager {
       }
     });
   }
-
-  // Returns true if the key event should be passed through to xterm,
-  // false if the manager handled it
-  private handleKey = (e: KeyboardEvent): boolean => {
-    if (e.type !== "keydown") return true;
-
-    const kb = this.config.keybindings;
-
-    if (matchesKeybinding(e, kb.newTab)) {
-      e.preventDefault();
-      this.createTab();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.closeTab)) {
-      e.preventDefault();
-      if (this.activeTabId) this.closeTab(this.activeTabId);
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.nextTab)) {
-      e.preventDefault();
-      this.nextTab();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.prevTab)) {
-      e.preventDefault();
-      this.prevTab();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.reloadConfig)) {
-      e.preventDefault();
-      this.reloadConfig();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.cycleAttention)) {
-      e.preventDefault();
-      this.cycleAttentionTabs();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.search)) {
-      e.preventDefault();
-      if (this.activeTabId) {
-        const tab = this.tabs.get(this.activeTabId);
-        tab?.toggleSearch();
-      }
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.quickSwitch)) {
-      e.preventDefault();
-      this.showQuickSwitch();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.commandPalette)) {
-      e.preventDefault();
-      this.openCommandPalette();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.splitHorizontal)) {
-      e.preventDefault();
-      this.splitActiveTab("horizontal");
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.splitVertical)) {
-      e.preventDefault();
-      this.splitActiveTab("vertical");
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.closePane)) {
-      e.preventDefault();
-      this.closeActivePane();
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.focusNextPane)) {
-      e.preventDefault();
-      if (this.activeTabId) {
-        this.tabs.get(this.activeTabId)?.focusNextPane();
-      }
-      return false;
-    }
-
-    if (matchesKeybinding(e, kb.focusPrevPane)) {
-      e.preventDefault();
-      if (this.activeTabId) {
-        this.tabs.get(this.activeTabId)?.focusPrevPane();
-      }
-      return false;
-    }
-
-    // Cmd+1-9: switch to tab by index
-    if (e.metaKey && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "9") {
-      e.preventDefault();
-      const index = parseInt(e.key) - 1;
-      const ids = Array.from(this.tabs.keys());
-      if (index < ids.length) {
-        this.switchToTab(ids[index]);
-      }
-      return false;
-    }
-
-    // Quick commands — user-defined keybindings that type into the terminal
-    if (this.config.quickCommands) {
-      for (const [binding, text] of Object.entries(this.config.quickCommands)) {
-        if (matchesKeybinding(e, binding)) {
-          e.preventDefault();
-          this.writeToActivePty(text);
-          return false;
-        }
-      }
-    }
-
-    return true; // not handled, pass to xterm
-  };
 
   async createTab(restoreCwd?: string, startupCommand?: string) {
     // Guard against concurrent tab creation (e.g. rapid button clicks)
@@ -976,156 +879,7 @@ export class TerminalManager {
 
   private renderTabList() {
     const list = document.getElementById("tab-list")!;
-
-    // Remove elements for closed tabs
-    for (const [id, el] of this.tabElements) {
-      if (!this.tabs.has(id)) {
-        el.remove();
-        this.tabElements.delete(id);
-        this.tabChildRefs.delete(id);
-      }
-    }
-
-    let index = 0;
-    for (const [id, tab] of this.tabs) {
-      let entry = this.tabElements.get(id);
-
-      if (!entry) {
-        // Create new tab entry
-        entry = document.createElement("div");
-        entry.setAttribute("data-id", id);
-        entry.setAttribute("role", "tab");
-
-        const icon = document.createElement("span");
-        icon.className = "tab-icon";
-        icon.setAttribute("data-role", "icon");
-
-        const titleWrap = document.createElement("div");
-        titleWrap.className = "tab-title-wrap";
-
-        const title = document.createElement("span");
-        title.className = "tab-title";
-        titleWrap.appendChild(title);
-
-        const sub = document.createElement("span");
-        sub.className = "tab-subtitle";
-        titleWrap.appendChild(sub);
-
-        const hint = document.createElement("span");
-        hint.className = "tab-shortcut";
-
-        const close = document.createElement("button");
-        close.className = "tab-close";
-        close.textContent = "\u00d7";
-        close.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.closeTab(id);
-        });
-
-        entry.appendChild(icon);
-        entry.appendChild(titleWrap);
-        entry.appendChild(hint);
-        entry.appendChild(close);
-
-        entry.addEventListener("click", () => this.switchToTab(id));
-        entry.addEventListener("contextmenu", (e) => {
-          this.showTabContextMenu(e, id);
-        });
-
-        // Drag-and-drop reordering
-        entry.setAttribute("draggable", "true");
-        const tabEl = entry; // const capture for closures
-        tabEl.addEventListener("dragstart", (e) => {
-          this.dragTabId = id;
-          tabEl.classList.add("dragging");
-          if (e.dataTransfer) {
-            e.dataTransfer.effectAllowed = "move";
-          }
-        });
-        tabEl.addEventListener("dragend", () => {
-          this.dragTabId = null;
-          tabEl.classList.remove("dragging");
-          list.querySelectorAll(".tab-entry").forEach((node) => {
-            node.classList.remove("drag-over-above", "drag-over-below");
-          });
-        });
-        tabEl.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          if (!this.dragTabId || this.dragTabId === id) return;
-          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-          const rect = tabEl.getBoundingClientRect();
-          const midY = rect.top + rect.height / 2;
-          tabEl.classList.toggle("drag-over-above", e.clientY < midY);
-          tabEl.classList.toggle("drag-over-below", e.clientY >= midY);
-        });
-        tabEl.addEventListener("dragleave", () => {
-          tabEl.classList.remove("drag-over-above", "drag-over-below");
-        });
-        tabEl.addEventListener("drop", (e) => {
-          e.preventDefault();
-          tabEl.classList.remove("drag-over-above", "drag-over-below");
-          if (!this.dragTabId || this.dragTabId === id) return;
-          const rect = tabEl.getBoundingClientRect();
-          const midY = rect.top + rect.height / 2;
-          const insertBefore = e.clientY < midY;
-          this.reorderTab(this.dragTabId, id, insertBefore);
-        });
-
-        this.tabElements.set(id, entry);
-        this.tabChildRefs.set(id, { icon, title, sub, hint });
-        list.appendChild(entry);
-      }
-
-      const refs = this.tabChildRefs.get(id)!;
-
-      // Update classes
-      let cls = "tab-entry";
-      if (id === this.activeTabId) cls += " active";
-      if (tab.state.needsAttention) cls += " needs-attention";
-      if (tab.state.activity === "agent-waiting") cls += " agent-waiting";
-      if (tab.state.activity === "error") cls += " has-error";
-      if (tab.pinned) cls += " pinned";
-      if (tab.muted) cls += " muted";
-      entry.className = cls;
-      entry.setAttribute("aria-selected", id === this.activeTabId ? "true" : "false");
-
-      // Update icon
-      const activityInfo = ACTIVITY_ICONS[tab.state.activity];
-      const newIconClass = `tab-icon ${activityInfo.cssClass}`;
-      if (refs.icon.className !== newIconClass) {
-        refs.icon.className = newIconClass;
-        refs.icon.title = activityInfo.label;
-        refs.icon.replaceChildren();
-        const svgClone = PARSED_ICONS[tab.state.activity]?.cloneNode(true);
-        if (svgClone) refs.icon.appendChild(svgClone);
-      }
-
-      // Update title
-      if (refs.title.textContent !== tab.title) {
-        refs.title.textContent = tab.title;
-      }
-
-      // Update subtitle
-      const subtitle = computeSubtitle(tab.state);
-      refs.sub.textContent = subtitle ?? "";
-      refs.sub.style.display = subtitle ? "" : "none";
-
-      // Update shortcut hint
-      if (index < 9) {
-        refs.hint.textContent = `${modLabel}${index + 1}`;
-        refs.hint.style.display = "";
-      } else {
-        refs.hint.textContent = "";
-        refs.hint.style.display = "none";
-      }
-
-      // Ensure correct order in DOM
-      if (entry !== list.children[index]) {
-        list.insertBefore(entry, list.children[index] || null);
-      }
-
-      index++;
-    }
+    this.tabRenderer.renderTabList(list, this.tabs, this.activeTabId);
   }
 
   private reorderTab(dragId: string, targetId: string, insertBefore: boolean) {
@@ -1195,42 +949,8 @@ export class TerminalManager {
   }
 
   private updateStatusBar() {
-    if (!this.activeTabId) return;
-    const tab = this.tabs.get(this.activeTabId);
-    if (!tab) return;
-
-    const cwdEl = document.getElementById("status-cwd");
-    const gitEl = document.getElementById("status-git");
-    const processEl = document.getElementById("status-process");
-    const serverEl = document.getElementById("status-server");
-    const agentEl = document.getElementById("status-agent");
-
-    if (cwdEl) cwdEl.textContent = tab.state.folderName;
-    if (gitEl) {
-      gitEl.textContent = tab.state.gitBranch ? `\u2387 ${tab.state.gitBranch}` : "";
-    }
-    if (processEl) {
-      processEl.textContent = tab.state.isIdle ? "" : tab.state.processName;
-    }
-    if (serverEl) {
-      serverEl.textContent = tab.state.serverPort ? `:${tab.state.serverPort}` : "";
-      serverEl.className = tab.state.serverPort ? "status-active" : "";
-    }
-    if (agentEl) {
-      if (tab.state.activity === "agent-waiting") {
-        agentEl.textContent = `${tab.state.agentName ?? "agent"} — waiting`;
-        agentEl.className = "status-waiting";
-      } else if (tab.state.agentName) {
-        agentEl.textContent = tab.state.agentName;
-        agentEl.className = "status-active";
-      } else if (tab.state.lastError) {
-        agentEl.textContent = tab.state.lastError;
-        agentEl.className = "status-error";
-      } else {
-        agentEl.textContent = "";
-        agentEl.className = "";
-      }
-    }
+    const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
+    this.tabRenderer.updateStatusBar(tab?.state ?? null);
   }
 
   private async reloadConfig() {
@@ -1277,15 +997,7 @@ export class TerminalManager {
   }
 
   private computeTabSnapshot(): string {
-    const parts: string[] = [];
-    for (const [id, tab] of this.tabs) {
-      const s = tab.state;
-      parts.push(
-        `${id}|${tab.title}|${s.activity}|${s.needsAttention}|${s.serverPort}|${s.agentName}|${s.lastError}|${s.gitBranch}`,
-      );
-    }
-    parts.push(`active:${this.activeTabId}`);
-    return parts.join(";");
+    return this.tabRenderer.computeTabSnapshot(this.tabs, this.activeTabId);
   }
 
   private setupResize() {
@@ -1323,7 +1035,6 @@ export class TerminalManager {
       tab.dispose();
     }
     this.tabs.clear();
-    this.tabElements.clear();
-    this.tabChildRefs.clear();
+    this.tabRenderer.clear();
   }
 }
