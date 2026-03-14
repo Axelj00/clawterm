@@ -17,5 +17,10 @@ getCurrentWindow().onCloseRequested(async () => {
   manager.dispose();
 });
 
+// Pause CSS animations when window is hidden to save battery
+document.addEventListener("visibilitychange", () => {
+  document.documentElement.classList.toggle("window-hidden", document.hidden);
+});
+
 // Check for updates on launch and periodically
 startUpdateChecker();

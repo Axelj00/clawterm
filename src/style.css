@@ -412,6 +412,21 @@ body {
   }
 }
 
+/* Pause non-essential animations on inactive tabs to reduce GPU/CPU work.
+   Attention and agent-waiting pulses are kept active since they signal the user. */
+.tab-entry:not(.active) .tab-icon.activity-running {
+  animation-play-state: paused;
+}
+
+.tab-entry:not(.active) .tab-icon.activity-completed {
+  animation-play-state: paused;
+}
+
+/* When window is hidden (user switched app), pause all animations */
+.window-hidden * {
+  animation-play-state: paused !important;
+}
+
 #sidebar-footer {
   padding: 8px;
   display: flex;
