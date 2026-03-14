@@ -4,8 +4,6 @@ import {
   isPermissionGranted,
   requestPermission,
   sendNotification,
-  registerActionTypes,
-  onAction,
 } from "@tauri-apps/plugin-notification";
 
 interface NotificationTypeConfig {
@@ -58,9 +56,8 @@ export class NotificationManager {
   private audioCtx: AudioContext | null = null;
   private permissionGranted = false;
   private notifCounter = 0;
-  private actionListener: { unregister(): Promise<void> } | null = null;
-
-  /** Set this callback to handle notification clicks (focus a tab) */
+  /** Set this callback to handle notification clicks (focus a tab).
+   *  Note: not yet functional on desktop (registerActionTypes is mobile-only). */
   onFocusTab: ((tabId: string) => void) | null = null;
 
   constructor(config?: NotificationsConfig) {
@@ -80,21 +77,8 @@ export class NotificationManager {
         this.permissionGranted = result === "granted";
       }
 
-      // Register action types for click-to-focus
-      await registerActionTypes([
-        {
-          id: "clawterm-default",
-          actions: [{ id: "show-tab", title: "Show", foreground: true }],
-        },
-      ]);
-
-      // Listen for notification clicks
-      this.actionListener = await onAction((notification) => {
-        const tabId = (notification as any).extra?.tabId as string | undefined;
-        if (tabId && this.onFocusTab) {
-          this.onFocusTab(tabId);
-        }
-      });
+      // Note: registerActionTypes/onAction are mobile-only in tauri-plugin-notification.
+      // Notification click-to-focus is not available on desktop yet.
     } catch (e) {
       logger.debug("Failed to init notification permission:", e);
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -178,8 +162,6 @@ export class NotificationManager {
       this.audioCtx.close();
       this.audioCtx = null;
     }
-    this.actionListener?.unregister();
-    this.actionListener = null;
     this.onFocusTab = null;
   }
 

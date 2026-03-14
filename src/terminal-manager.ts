@@ -116,7 +116,6 @@ export class TerminalManager {
     this.setupResize();
     this.setupServerTracker();
     this.setupStatusBarClicks();
-    this.startCentralPoll();
 
     // Restore session or create a fresh tab.
     // Each tab is restored in isolation — a single failure doesn't cascade.
@@ -172,6 +171,9 @@ export class TerminalManager {
     } else {
       await this.createTab();
     }
+
+    // Start polling after session restore so PTY PIDs have time to resolve
+    this.startCentralPoll();
   }
 
   private setupServerTracker() {

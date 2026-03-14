@@ -369,7 +369,9 @@ mod platform {
     pub fn proc_cwd(pid: u32) -> Result<String, String> {
         #[repr(C)]
         struct VnodeInfoPath {
-            _vip_vi: [u8; 160],
+            // macOS vnode_info is 152 bytes (vinfo_stat=136 + vnode fields).
+            // Previously 160, which caused CWD paths to be truncated by 8 chars.
+            _vip_vi: [u8; 152],
             vip_path: [libc::c_char; 1024],
         }
 
