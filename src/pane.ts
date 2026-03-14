@@ -446,7 +446,13 @@ export class Pane {
 
   fit() {
     if (this.element.offsetWidth > 0 && this.element.offsetHeight > 0) {
+      // Preserve scroll position across fit — xterm.js reflow can jump to top
+      const buf = this.terminal.buffer.active;
+      const wasAtBottom = buf.viewportY >= buf.baseY;
       this.fitAddon.fit();
+      if (wasAtBottom) {
+        this.terminal.scrollToBottom();
+      }
     }
   }
 
