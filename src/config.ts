@@ -195,7 +195,7 @@ const DEFAULT_CONFIG: Config = {
   },
   startupCommands: {},
   maxTabs: 20,
-  maxPanes: 16,
+  maxPanes: 4,
   outputAnalysis: {
     enabled: true,
     bufferSize: 4096,
