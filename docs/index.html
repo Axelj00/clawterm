@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clawterm — A terminal built for AI agents</title>
+  <meta name="description" content="A lightweight terminal emulator with vertical tabs, split panes, and native macOS feel. Built for running AI coding agents.">
+  <meta property="og:title" content="Clawterm">
+  <meta property="og:description" content="A terminal built for AI coding agents. Vertical tabs, split panes, fast PTY.">
+  <meta property="og:image" content="https://clawterm.github.io/clawterm/screenshots/clawterm.png">
+  <meta property="og:type" content="website">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --border: #222;
+      --text: #e5e5e5;
+      --text-muted: #888;
+      --accent: #4ade80;
+      --accent-dim: rgba(74, 222, 128, 0.15);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Nav */
+    nav {
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .logo span { color: var(--accent); }
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      font-size: 14px;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .hero p {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 520px;
+      margin: 0 auto 32px;
+    }
+    .hero-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+    .btn-primary:hover {
+      background: #6ee7a0;
+      text-decoration: none;
+    }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover {
+      border-color: #444;
+      text-decoration: none;
+    }
+
+    /* Screenshot */
+    .screenshot {
+      padding: 0 0 80px;
+      text-align: center;
+    }
+    .screenshot img {
+      max-width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Features */
+    .features {
+      padding: 60px 0;
+      border-top: 1px solid var(--border);
+    }
+    .features h2 {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 48px;
+      letter-spacing: -0.02em;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Install */
+    .install {
+      padding: 60px 0;
+      border-top: 1px solid var(--border);
+    }
+    .install h2 {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 32px;
+      letter-spacing: -0.02em;
+    }
+    .install-code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 14px;
+      color: var(--accent);
+      max-width: 640px;
+      margin: 0 auto 16px;
+      overflow-x: auto;
+    }
+    .install-alt {
+      text-align: center;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    footer a { color: var(--text-muted); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 32px; }
+      .hero p { font-size: 16px; }
+      .hero { padding: 48px 0 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <div class="logo"><span>&gt;</span> clawterm</div>
+    <ul class="nav-links">
+      <li><a href="https://github.com/clawterm/clawterm">GitHub</a></li>
+      <li><a href="https://github.com/clawterm/clawterm/releases/latest">Download</a></li>
+      <li><a href="https://github.com/clawterm/clawterm/discussions">Community</a></li>
+    </ul>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <h1>A terminal built for <em>AI agents</em></h1>
+    <p>Vertical tabs, split panes, fast PTY, native macOS feel. Run Claude Code, Codex, and other AI coding agents without the overhead of a full IDE.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/clawterm/clawterm/releases/latest" class="btn btn-primary">Download for macOS</a>
+      <a href="https://github.com/clawterm/clawterm" class="btn btn-secondary">View on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<section class="screenshot">
+  <div class="container">
+    <img src="screenshots/clawterm.png" alt="Clawterm with split panes and transparent window">
+  </div>
+</section>
+
+<section class="features">
+  <div class="container">
+    <h2>Built different</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">|</div>
+        <h3>Vertical tabs</h3>
+        <p>Always-visible sidebar keeps your sessions organized. Right-click to launch preset commands.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">#</div>
+        <h3>Split panes</h3>
+        <p>Horizontal and vertical splits with keyboard shortcuts. Run multiple agents side by side.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&gt;_</div>
+        <h3>Fast PTY</h3>
+        <p>Native Rust PTY backend via Tauri. Low latency, low memory, real terminal emulation with xterm.js.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">~</div>
+        <h3>macOS native</h3>
+        <p>Transparent window, traffic light buttons, system font rendering. Feels like it belongs on your Mac.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">!</div>
+        <h3>Smart notifications</h3>
+        <p>Get notified when long-running commands finish. Never miss a completed build or test run.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">^</div>
+        <h3>Auto-updates</h3>
+        <p>Built-in updater checks for new versions and installs with one click. Always stay current.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="install">
+  <div class="container">
+    <h2>Install</h2>
+    <div class="install-code">curl -fsSL https://raw.githubusercontent.com/clawterm/clawterm/main/install.sh | bash</div>
+    <p class="install-alt">Or download the <a href="https://github.com/clawterm/clawterm/releases/latest">.dmg from GitHub Releases</a>. macOS Apple Silicon.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>MIT License &middot; <a href="https://github.com/clawterm/clawterm">GitHub</a> &middot; <a href="https://github.com/clawterm/clawterm/discussions">Discussions</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
