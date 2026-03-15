@@ -150,8 +150,13 @@ function showUpdateNotice(version: string, onInstall: () => void): void {
   const footer = document.getElementById("sidebar-footer");
   if (!footer) return;
 
-  // Don't show duplicate notices
-  if (footer.querySelector(".update-notice")) return;
+  // If a notice already exists, update its version text and bail
+  const existing = footer.querySelector(".update-notice");
+  if (existing) {
+    const ver = existing.querySelector(".update-notice-version");
+    if (ver) ver.textContent = version;
+    return;
+  }
 
   const notice = document.createElement("div");
   notice.className = "update-notice";
