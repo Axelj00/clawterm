@@ -147,11 +147,11 @@ function showUpdateConfirm(version: string, onConfirm: () => void): void {
 }
 
 function showUpdateNotice(version: string, onInstall: () => void): void {
-  const container = document.getElementById("terminal-area");
-  if (!container) return;
+  const footer = document.getElementById("sidebar-footer");
+  if (!footer) return;
 
   // Don't show duplicate notices
-  if (container.querySelector(".update-notice")) return;
+  if (footer.querySelector(".update-notice")) return;
 
   const notice = document.createElement("div");
   notice.className = "update-notice";
@@ -178,7 +178,7 @@ function showUpdateNotice(version: string, onInstall: () => void): void {
   notice.appendChild(text);
   notice.appendChild(btn);
 
-  container.appendChild(notice);
+  footer.insertBefore(notice, footer.firstChild);
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();

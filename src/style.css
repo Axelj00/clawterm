@@ -1110,17 +1110,16 @@ body {
 
 /* Update notice — floating above utility buttons in bottom-right */
 .update-notice {
-  position: absolute;
-  bottom: 28px;
-  right: 8px;
-  z-index: 40;
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  margin-bottom: 6px;
   padding: 6px 10px;
   border-radius: 6px;
   background: rgba(10, 132, 255, 0.08);
   border: 1px solid rgba(10, 132, 255, 0.2);
+  box-sizing: border-box;
   animation: update-fade-in 0.3s ease;
 }
 
