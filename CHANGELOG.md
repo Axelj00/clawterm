@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-03-15
+
+### Fixed
+- Terminal still scrolls to top during bursty agent output — increased fit() deferral to 300ms with always-reschedule, deferred WebGL activation during output, suppressed false isScrolledUp from programmatic scrolls (#167)
+
+
 ## [0.9.3] - 2026-03-15
 
 ### Fixed
@@ -340,7 +346,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/clawterm/clawterm/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/clawterm/clawterm/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/clawterm/clawterm/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/clawterm/clawterm/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/clawterm/clawterm/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/clawterm/clawterm/compare/v0.9.0...v0.9.1
