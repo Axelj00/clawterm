@@ -10,6 +10,8 @@ A terminal for running many AI agents at once and keeping track of them.
 
 Vertical tabs with live agent status, split panes, per-pane context tracking, desktop notifications, and auto-updates. Built with [Tauri 2](https://v2.tauri.app/) + [xterm.js](https://xtermjs.org/).
 
+📖 **Docs:** <https://clawterm.github.io/clawterm/docs/>
+
 ## Install
 
 **macOS:**

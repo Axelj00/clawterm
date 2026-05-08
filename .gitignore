@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# VitePress
+docs/.vitepress/cache/
+
 # Rust build output
 src-tauri/target/
 

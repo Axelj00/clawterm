@@ -1,0 +1,64 @@
+name: Docs
+
+# Builds the marketing landing + VitePress docs site and deploys both
+# to gh-pages. The marketing landing (docs/index.html and adjacent
+# assets) lives at the site root; the VitePress build is published
+# under /docs/.
+#
+# After this workflow first runs, switch the GitHub Pages source
+# to the gh-pages branch in the repo settings.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build VitePress
+        run: npm run docs:build
+      - name: Assemble deploy directory
+        run: |
+          set -euo pipefail
+          mkdir -p deploy
+          # Marketing landing assets at the site root
+          cp docs/index.html deploy/
+          cp docs/favicon.png deploy/ 2>/dev/null || true
+          cp docs/favicon.svg deploy/ 2>/dev/null || true
+          cp docs/sitemap.xml deploy/ 2>/dev/null || true
+          cp docs/sitemap-landing.xml deploy/ 2>/dev/null || true
+          cp docs/robots.txt deploy/ 2>/dev/null || true
+          if [ -d docs/screenshots ]; then
+            cp -r docs/screenshots deploy/
+          fi
+          # VitePress site under /docs/
+          mkdir -p deploy/docs
+          cp -r docs/.vitepress/dist/. deploy/docs/
+          # Don't let Jekyll touch our hashed asset filenames.
+          touch deploy/.nojekyll
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy
+          publish_branch: gh-pages
