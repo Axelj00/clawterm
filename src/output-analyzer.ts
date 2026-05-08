@@ -12,6 +12,13 @@ const MATCH_DEBOUNCE_MS = 100;
 /** Max number of events to retain in history */
 const MAX_EVENT_HISTORY = 200;
 
+/** Cap pendingText fed into the ANSI regex per debounce tick (#466).
+ *  Comfortably exceeds the 2KB matchText window plus the 256-byte overlap,
+ *  so every matcher still sees a complete match window — but bursts of
+ *  100KB+ (agent tool dumps, long file contents) no longer drag the giant
+ *  ANSI alternation across every byte. */
+const ANSI_INPUT_CAP = 8192;
+
 export class OutputAnalyzer {
   private matchers: OutputMatcher[];
   private lastFired: Map<string, number> = new Map();
@@ -48,7 +55,9 @@ export class OutputAnalyzer {
 
   private runMatchers() {
     this.matchTimer = null;
-    const clean = this.pendingText.replace(ANSI_RE, "");
+    const truncated =
+      this.pendingText.length > ANSI_INPUT_CAP ? this.pendingText.slice(-ANSI_INPUT_CAP) : this.pendingText;
+    const clean = truncated.replace(ANSI_RE, "");
     this.pendingText = "";
 
     const rawMatchText = this.overlapWindow + clean;
