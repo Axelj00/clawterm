@@ -109,6 +109,9 @@ export class Pane {
   private searchBar: SearchBar | null = null;
   private cwd: string | undefined;
   lastFullCwd: string | null = null;
+  /** Last raw Claude statusLine JSON observed; used to skip re-parsing
+   *  identical payloads on polls between assistant turns. */
+  lastClaudeStatusJson: string | null = null;
   private scrollPill: HTMLDivElement | null = null;
   private pasteOverlay: HTMLDivElement | null = null;
   private webgl: WebGLManager | null = null;
@@ -762,23 +765,12 @@ export class Pane {
     this.footerRow2.style.display = "none";
     this.footer.className = "pane-footer";
 
-    const spacer = document.createElement("span");
-    spacer.className = "footer-spacer";
-    this.footerRow1.appendChild(spacer);
-
+    pushSpan(this.footerRow1, "footer-spacer", "");
     if (s.gitBranch) {
-      const branchSpan = document.createElement("span");
-      branchSpan.className = "footer-branch";
-      let branchText = s.gitBranch;
-      if (gs && gs.ahead > 0) branchText += ` \u2191${gs.ahead}`;
-      branchSpan.textContent = branchText;
-      this.footerRow1.appendChild(branchSpan);
+      const branchText = gs && gs.ahead > 0 ? `${s.gitBranch} \u2191${gs.ahead}` : s.gitBranch;
+      pushSpan(this.footerRow1, "footer-branch", branchText);
     }
-
-    const elapsedSpan = document.createElement("span");
-    elapsedSpan.className = "footer-elapsed";
-    elapsedSpan.textContent = formatElapsed(this.createdAt);
-    this.footerRow1.appendChild(elapsedSpan);
+    pushSpan(this.footerRow1, "footer-elapsed", formatElapsed(this.createdAt));
 
     if (sl) renderClaudeRow(this.footerRow2, sl);
   }

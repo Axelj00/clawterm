@@ -82,16 +82,12 @@ pub async fn poll_pane_info(
     };
 
     // 4. Claude Code statusLine — only the foreground PID is meaningful.
-    // The script keys files by the parent's PID, which is Claude Code; when
-    // the shell is foreground there's no file to read. Off the command
-    // worker thread so a slow disk read can't stall the IPC pool.
+    // The script keys files by the parent's PID (Claude Code); when the
+    // shell is foreground there's no file. Cheap absence check inline
+    // (sub-µs stat); only dispatch to the blocking pool when there's
+    // actual content to read.
     let claude_status = match fg_pid {
-        Some(pid) if pid != shell_pid => {
-            tauri::async_runtime::spawn_blocking(move || read_claude_status_for_pid(pid))
-                .await
-                .ok()
-                .flatten()
-        }
+        Some(pid) if pid != shell_pid => read_claude_status_async(pid).await,
         _ => None,
     };
 
@@ -104,9 +100,22 @@ pub async fn poll_pane_info(
     })
 }
 
-/// Read the Claude Code statusLine JSON for the given PID. Returns None
-/// when the file is missing, unreadable, or stale.
-fn read_claude_status_for_pid(pid: u32) -> Option<String> {
+/// Returns the statusLine JSON for `pid`, or None when the file is missing,
+/// stale, or unreadable. The absence/stale checks run inline (cheap stat);
+/// the actual read goes through the blocking pool so a slow disk doesn't
+/// stall the IPC worker.
+async fn read_claude_status_async(pid: u32) -> Option<String> {
+    let path = claude_status_path_if_fresh(pid)?;
+    tauri::async_runtime::spawn_blocking(move || std::fs::read_to_string(&path).ok())
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Resolve the on-disk statusLine path for `pid` and verify it exists and
+/// isn't stale. Returns None on any failure. Used by both the async reader
+/// and tests.
+fn claude_status_path_if_fresh(pid: u32) -> Option<std::path::PathBuf> {
     let path = std::path::PathBuf::from(CLAUDE_STATUS_DIR).join(format!("{}.json", pid));
     let metadata = std::fs::metadata(&path).ok()?;
     let stale = metadata
@@ -117,7 +126,7 @@ fn read_claude_status_for_pid(pid: u32) -> Option<String> {
     if stale {
         return None;
     }
-    std::fs::read_to_string(&path).ok()
+    Some(path)
 }
 
 /// Convert a full CWD path to a display folder name.
@@ -320,24 +329,22 @@ mod tests {
     }
 
     #[test]
-    fn test_read_claude_status_missing_file_returns_none() {
-        assert!(read_claude_status_for_pid(0).is_none());
+    fn test_claude_status_path_missing_returns_none() {
+        assert!(claude_status_path_if_fresh(0).is_none());
     }
 
     #[test]
-    fn test_read_claude_status_fresh_file_returns_contents() {
+    fn test_claude_status_path_fresh_returns_path() {
         let dir = std::path::PathBuf::from(CLAUDE_STATUS_DIR);
         if std::fs::create_dir_all(&dir).is_err() {
             return;
         }
-        // Pid the OS won't reuse during the test (above i32::MAX) and that's
-        // unique to this test so parallel runs don't race.
+        // PID near u32::MAX so parallel test runs don't race on a real PID.
         let pid: u32 = u32::MAX - 17;
         let path = dir.join(format!("{}.json", pid));
-        let payload = r#"{"session_id":"s1","model":{"id":"x","display_name":"X"}}"#;
-        let _ = std::fs::write(&path, payload);
-        let res = read_claude_status_for_pid(pid);
+        let _ = std::fs::write(&path, r#"{"session_id":"s1"}"#);
+        let resolved = claude_status_path_if_fresh(pid);
         let _ = std::fs::remove_file(&path);
-        assert_eq!(res.as_deref(), Some(payload));
+        assert_eq!(resolved.as_deref(), Some(path.as_path()));
     }
 }

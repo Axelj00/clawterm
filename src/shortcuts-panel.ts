@@ -110,6 +110,16 @@ function findConflict(config: Config, binding: string, exceptKey: ActionKey): Ac
   return null;
 }
 
+/** Look up the human-readable label for an action key (for conflict banners). */
+function labelForAction(config: Config, key: ActionKey): string {
+  for (const group of buildGroups(config)) {
+    for (const entry of group.entries) {
+      if (entry.actionKey === key) return entry.label;
+    }
+  }
+  return String(key);
+}
+
 interface PanelOptions {
   config: Config;
   onOpenConfig: () => void;
@@ -371,7 +381,7 @@ export function createSettingsPanel(opts: PanelOptions): ShortcutsPanel {
     row.querySelector(".shortcuts-conflict")?.remove();
     const banner = document.createElement("div");
     banner.className = "shortcuts-conflict";
-    banner.textContent = `Already bound to ${conflictKey} — replace?`;
+    banner.textContent = `Already bound to ${labelForAction(config, conflictKey)} — replace?`;
 
     const replace = document.createElement("button");
     replace.textContent = "Replace";

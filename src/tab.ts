@@ -791,7 +791,12 @@ export class Tab {
         timeout,
       );
 
-      ps.statusLine = result.claude_status ? parseStatusLine(result.claude_status) : null;
+      // Skip re-parsing identical payloads — Claude only writes after each
+      // assistant turn, so most polls see the same JSON.
+      if (result.claude_status !== pane.lastClaudeStatusJson) {
+        pane.lastClaudeStatusJson = result.claude_status;
+        ps.statusLine = result.claude_status ? parseStatusLine(result.claude_status) : null;
+      }
 
       const fullCwd = result.cwd_full || null;
       ps.folderName = result.cwd_folder || ps.folderName;
