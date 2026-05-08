@@ -25,6 +25,8 @@ import { DEFAULT_MATCHERS } from "../src/matchers";
 
 describe("PTY → OutputAnalyzer pipeline", () => {
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const decode = (d: string | Uint8Array) => (typeof d === "string" ? d : decoder.decode(d));
 
   it("forwards data chunks to the analyzer and fires matcher events", async () => {
     const pty = createMockPty();
@@ -32,8 +34,7 @@ describe("PTY → OutputAnalyzer pipeline", () => {
     const events: string[] = [];
     analyzer.onEvent((e) => events.push(e.type));
     pty.onData((d) => {
-      const bytes = typeof d === "string" ? encoder.encode(d) : d;
-      analyzer.feed(bytes);
+      analyzer.feed(typeof d === "string" ? encoder.encode(d) : d);
     });
 
     // Use the agent-waiting matcher payload — it's in DEFAULT_MATCHERS.
@@ -79,9 +80,9 @@ describe("PTY → OutputAnalyzer pipeline", () => {
     const pty = createMockPty();
     const received: string[] = [];
     pty.onData((d) => {
-      received.push(typeof d === "string" ? d : new TextDecoder().decode(d));
+      received.push(decode(d));
     });
-    pty.feedAll(["a", "b", new TextEncoder().encode("c")]);
+    pty.feedAll(["a", "b", encoder.encode("c")]);
     expect(received).toEqual(["a", "b", "c"]);
   });
 
@@ -89,7 +90,7 @@ describe("PTY → OutputAnalyzer pipeline", () => {
     const pty = createMockPty();
     const received: string[] = [];
     pty.onData((d) => {
-      received.push(typeof d === "string" ? d : new TextDecoder().decode(d));
+      received.push(decode(d));
     });
     pty.feed("alive\n");
     pty.kill();

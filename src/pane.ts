@@ -348,7 +348,9 @@ export class Pane {
     // Zsh/oh-my-zsh set the title on every prompt, giving us instant CWD detection.
     this.disposables.push(
       this.terminal.onTitleChange((title) => {
-        this.onTerminalTitle?.(title);
+        // Cap untrusted title text — symmetric with the OSC 9;2 cap (#479)
+        const safe = title.length > 256 ? title.slice(0, 256) + "…" : title;
+        this.onTerminalTitle?.(safe);
       }),
     );
 
@@ -854,17 +856,13 @@ export class Pane {
       //                     upward scrolls; survives xterm's auto-follow
       //                     snap-back when the pre-write snapshot missed
       //                     the user's intent. (#432)
-      const liveBuf = this.terminal.buffer.active;
-      const liveDistance = Math.max(0, liveBuf.baseY - liveBuf.viewportY);
+      const liveDistance = this.scrollAnchor.currentDistance();
       let distance = Math.max(savedDistance, liveDistance);
       if (distance === 0 && this.scrollAnchor.isUserScrolledUp) {
         distance = 1;
       }
       if (distance > 0) {
-        const targetY = Math.max(0, liveBuf.baseY - distance);
-        this.scrollAnchor.setFitting(true);
-        this.terminal.scrollToLine(targetY);
-        this.scrollAnchor.setFitting(false);
+        this.scrollAnchor.restoreSuppressed(distance);
       }
 
       if (moreRemaining) {
@@ -877,7 +875,8 @@ export class Pane {
 
       // Final chunk — drop the saved distance and surface the scroll pill.
       this.scrollAnchor.clearFlushAnchor();
-      if (this.scrollAnchor.isScrolledUp) {
+      const finalBuf = this.terminal.buffer.active;
+      if (finalBuf.viewportY < finalBuf.baseY) {
         this.showScrollPill("new-output");
       }
     });
@@ -905,16 +904,11 @@ export class Pane {
    *  distance-from-bottom after xterm.js finishes parsing — preventing
    *  Viewport._sync() from corrupting scroll. (#419) */
   private scrollSafeWrite(data: string) {
-    const buf = this.terminal.buffer.active;
-    const savedDistance = Math.max(0, buf.baseY - buf.viewportY);
+    const savedDistance = this.scrollAnchor.currentDistance();
     const wasScrolledUp = this.scrollAnchor.isUserScrolledUp;
     this.terminal.write(data, () => {
       if (wasScrolledUp) {
-        const max = this.terminal.buffer.active.baseY;
-        const targetY = Math.max(0, max - savedDistance);
-        this.scrollAnchor.setFitting(true);
-        this.terminal.scrollToLine(targetY);
-        this.scrollAnchor.setFitting(false);
+        this.scrollAnchor.restoreSuppressed(savedDistance);
       }
     });
   }
@@ -934,7 +928,6 @@ export class Pane {
     if (this.scrollAnchor.isFitting || this.scrollAnchor.isLocked) return;
     const buf = this.terminal.buffer.active;
     const atBottom = buf.viewportY >= buf.baseY;
-    this.scrollAnchor.setScrolledUp(!atBottom);
     if (atBottom) {
       this.scrollAnchor.setUserScrolledUp(false);
       this.hideScrollPill();

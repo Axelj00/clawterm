@@ -1,3 +1,5 @@
+import { setBounded } from "./utils";
+
 /** Structured git status from the Rust backend */
 export interface GitStatusInfo {
   branch: string;
@@ -122,10 +124,6 @@ export function branchColor(branch: string): string {
     hash = ((hash << 5) - hash + branch.charCodeAt(i)) | 0;
   }
   const color = BRANCH_COLORS[Math.abs(hash) % BRANCH_COLORS.length];
-  if (branchColorCache.size >= BRANCH_COLOR_CACHE_MAX) {
-    const oldest = branchColorCache.keys().next().value;
-    if (oldest !== undefined) branchColorCache.delete(oldest);
-  }
-  branchColorCache.set(branch, color);
+  setBounded(branchColorCache, branch, color, BRANCH_COLOR_CACHE_MAX);
   return color;
 }

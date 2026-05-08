@@ -1,5 +1,6 @@
 import type { Terminal, ILinkProvider, ILink, IBufferRange } from "@xterm/xterm";
 import { showToast } from "./toast";
+import { setBounded } from "./utils";
 
 /**
  * Custom xterm.js link provider that detects file paths in terminal output.
@@ -70,12 +71,7 @@ export class FileLinkProvider implements ILinkProvider {
     }
 
     const result = links.length > 0 ? links : undefined;
-    // Cap cache size to prevent unbounded growth
-    if (this.cache.size >= LINK_CACHE_MAX) {
-      const first = this.cache.keys().next().value!;
-      this.cache.delete(first);
-    }
-    this.cache.set(cacheKey, result);
+    setBounded(this.cache, cacheKey, result, LINK_CACHE_MAX);
     callback(result);
   }
 

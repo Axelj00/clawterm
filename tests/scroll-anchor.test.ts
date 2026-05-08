@@ -44,7 +44,18 @@ describe("ScrollAnchor", () => {
     expect(anchor.isLocked).toBe(false);
     expect(anchor.isFitting).toBe(false);
     expect(anchor.isUserScrolledUp).toBe(false);
-    expect(anchor.isScrolledUp).toBe(false);
+  });
+
+  it("restoreSuppressed wraps restore in fitting flag", () => {
+    let fittingDuringRestore = false;
+    const orig = term.scrollToBottom;
+    term.scrollToBottom = () => {
+      fittingDuringRestore = anchor.isFitting;
+      orig.call(term);
+    };
+    anchor.restoreSuppressed(0);
+    expect(fittingDuringRestore).toBe(true);
+    expect(anchor.isFitting).toBe(false);
   });
 
   it("currentDistance returns live distance when not locked", () => {

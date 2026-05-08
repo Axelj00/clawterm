@@ -4,29 +4,14 @@ import { logger } from "./logger";
 /** Encapsulates Pane's scroll-preservation invariants (#476).
  *
  *  Pre-extraction, eight loosely-coupled fields on Pane coordinated scroll
- *  behavior across hide/show cycles, write callbacks, and fitAddon reflows.
- *  Each was added in response to a real regression (#184/#305/#419/#432/#437).
+ *  behavior across hide/show, write callbacks, and fitAddon reflows — each
+ *  added in response to a real regression (#184/#305/#419/#432/#437). Behavior
+ *  is byte-identical; the change is encapsulation only.
  *
- *  Behavior is byte-identical to the inlined version. The change is
- *  encapsulation only — the relationship between the eight pieces of state
- *  was previously legible only to whoever last touched it. Now it is named.
- *
- *  Concepts
- *  ────────
- *  • locked: a tab-hide / tab-show critical section. While locked, onScroll
- *    is suppressed, fitCore reads the locked anchor instead of the live
- *    buffer, and unlock() does the single authoritative scroll restoration.
- *  • userScrolledUp: a *persistent* user-intent flag. True while the user is
- *    above the bottom; survives writes that would otherwise auto-follow.
- *  • scrolledUp: passive observer of viewport position; identical to
- *    userScrolledUp under steady state but they decouple briefly during
- *    programmatic scrolls.
- *  • fitting: suppresses onScroll side-effects during programmatic mutations.
- *  • flush anchor: lazily snapshotted per flush-sequence and held across
- *    chunks so a multi-frame flush restores to the same target.
- *  • trimmedDuringHide: gate for the #305 hidden-tab scrollback trim — without
- *    this, the lock-window invariant tripwire fires on every tab switch.
- */
+ *  The one non-obvious invariant: `userScrolled` is *persistent user intent*
+ *  and survives auto-follow snap-back; `currentDistance()` returning the
+ *  locked anchor (not the live distance) during a hide/show cycle is what
+ *  keeps mid-flight buffer mutations from moving the restore target. */
 export class ScrollAnchor {
   private fitting = false;
   private locked = false;
@@ -34,7 +19,6 @@ export class ScrollAnchor {
   private lockedBufferLen: number | null = null;
   private trimmedDuringHide_ = false;
   private userScrolled = false;
-  private scrolledUp = false;
   private flushDistance: number | null = null;
 
   constructor(
@@ -42,7 +26,6 @@ export class ScrollAnchor {
     private readonly paneId: string,
   ) {}
 
-  // ── State queries ──────────────────────────────────────────────────────
   get isLocked(): boolean {
     return this.locked;
   }
@@ -52,19 +35,12 @@ export class ScrollAnchor {
   get isUserScrolledUp(): boolean {
     return this.userScrolled;
   }
-  get isScrolledUp(): boolean {
-    return this.scrolledUp;
-  }
 
-  // ── State setters (named so call sites read like ops, not assignments) ──
   setFitting(value: boolean): void {
     this.fitting = value;
   }
   setUserScrolledUp(value: boolean): void {
     this.userScrolled = value;
-  }
-  setScrolledUp(value: boolean): void {
-    this.scrolledUp = value;
   }
 
   /** Mark the next observed buffer-length change as the known #305 trim, so
@@ -73,8 +49,8 @@ export class ScrollAnchor {
     this.trimmedDuringHide_ = true;
   }
 
-  /** Compute the current distance-from-bottom in lines. When locked, returns
-   *  the lock-time anchor so concurrent buffer mutations can't move the target. */
+  /** Distance-from-bottom in lines. While locked, returns the lock-time anchor
+   *  so concurrent buffer mutations can't move the target. */
   currentDistance(): number {
     if (this.locked && this.lockedDistance !== null) return this.lockedDistance;
     const buf = this.terminal.buffer.active;
@@ -87,15 +63,13 @@ export class ScrollAnchor {
     return this.flushDistance;
   }
 
-  /** End of flush sequence — drop the hold so the next sequence starts fresh. */
   clearFlushAnchor(): void {
     this.flushDistance = null;
   }
 
-  /** Restore scroll to a saved distance-from-bottom.
-   *  Callers must manage the fitting flag themselves — every call site
-   *  already wraps a wider critical section that needs the flag held
-   *  beyond the duration of this single scroll mutation. */
+  /** Scroll to a saved distance-from-bottom. Callers manage the fitting flag
+   *  themselves — every site already wraps a wider critical section.
+   *  See restoreSuppressed() for the one-call wrap-and-restore. */
   restore(distance: number): void {
     if (distance === 0 && !this.userScrolled) {
       this.terminal.scrollToBottom();
@@ -106,9 +80,19 @@ export class ScrollAnchor {
     }
   }
 
-  /** Acquire a scroll lock. Captures current distance-from-bottom and buffer
-   *  length; prevents updateScrollState from churning user intent while the
-   *  tab is in transition. (#184) */
+  /** restore() wrapped in setFitting(true)/finally setFitting(false). Use this
+   *  when the caller doesn't already own a wider fitting window. */
+  restoreSuppressed(distance: number): void {
+    this.fitting = true;
+    try {
+      this.restore(distance);
+    } finally {
+      this.fitting = false;
+    }
+  }
+
+  /** Acquire a scroll lock — captures distance + buffer length so unlock()
+   *  can restore exactly and detect unexpected buffer mutations. (#184) */
   lock(): void {
     this.locked = true;
     const buf = this.terminal.buffer.active;
@@ -117,8 +101,7 @@ export class ScrollAnchor {
   }
 
   /** Release the lock and perform the single authoritative scroll restoration.
-   *  Trips a warning if the buffer length changed during the lock window
-   *  outside the known #305 hidden-tab trim path. */
+   *  Trips a warning if buffer length changed outside the known #305 trim. */
   unlock(): void {
     if (!this.locked) return;
     this.locked = false;
@@ -133,12 +116,7 @@ export class ScrollAnchor {
     }
     this.trimmedDuringHide_ = false;
     if (this.lockedDistance !== null) {
-      this.fitting = true;
-      try {
-        this.restore(this.lockedDistance);
-      } finally {
-        this.fitting = false;
-      }
+      this.restoreSuppressed(this.lockedDistance);
     }
     this.lockedDistance = null;
     this.lockedBufferLen = null;

@@ -14,6 +14,17 @@ export function invokeWithTimeout<T>(cmd: string, args?: Record<string, unknown>
   ]);
 }
 
+/** Insert into a Map with a fixed maximum size, evicting the oldest entry
+ *  (insertion-order, FIFO) when at capacity. Map preserves insertion order,
+ *  so `keys().next().value` is the oldest. */
+export function setBounded<K, V>(map: Map<K, V>, key: K, value: V, max: number): void {
+  if (map.size >= max && !map.has(key)) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, value);
+}
+
 /** Query a shell PID's live CWD via the Rust backend.  Returns null on
  *  any failure so callers can fall back to their cached value. (#462) */
 export async function getLiveCwd(shellPid: number, timeoutMs: number): Promise<string | null> {
