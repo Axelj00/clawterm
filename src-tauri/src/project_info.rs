@@ -3,7 +3,6 @@ use serde::Deserialize;
 /// Read project manifest files to extract a project name.
 /// Checks package.json, Cargo.toml, pyproject.toml, go.mod in order.
 /// Falls back to the directory name.
-#[tauri::command]
 pub fn get_project_info(dir: String) -> String {
     let path = match std::fs::canonicalize(&dir) {
         Ok(p) => p,
