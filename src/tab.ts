@@ -221,17 +221,20 @@ export class Tab {
   async split(direction: SplitDirection) {
     const paneToSplit = this.focusedPane;
 
-    // Query the current CWD from the pane's process in real-time
+    // Query the shell's live CWD in a single IPC. The previous code dispatched
+    // get_foreground_process + get_process_cwd_full sequentially — but
+    // get_foreground_process was never registered, so every call fell through
+    // to the catch and lastFullCwd was used regardless. Use the shell's PID
+    // directly: poll_pane_info already uses proc_cwd(shellPid) every cycle to
+    // populate lastFullCwd, so this returns the same value but live. (#462)
     let cwd: string | undefined = paneToSplit.lastFullCwd ?? this.initialCwd;
     if (paneToSplit.ptyPid) {
       try {
-        const timeout = this.config.advanced.ipcTimeoutMs;
-        const fg = await invokeWithTimeout<{ name: string; pid: number }>(
-          "get_foreground_process",
+        const liveCwd = await invokeWithTimeout<string>(
+          "get_process_cwd_full",
           { pid: paneToSplit.ptyPid },
-          timeout,
+          this.config.advanced.ipcTimeoutMs,
         );
-        const liveCwd = await invokeWithTimeout<string>("get_process_cwd_full", { pid: fg.pid }, timeout);
         if (liveCwd) cwd = liveCwd;
       } catch (e) {
         logger.debug("Failed to get CWD for split:", e);

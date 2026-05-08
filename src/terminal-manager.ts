@@ -680,19 +680,21 @@ export class TerminalManager {
     const id = `tab-${this.tabCounter}`;
     const title = computeFolderTitle(createDefaultTabState());
 
-    // Use restored CWD, or inherit from active tab
+    // Use restored CWD, or inherit from active tab. The shell's CWD is
+    // queried via a single get_process_cwd_full IPC. The previous code
+    // dispatched get_foreground_process + get_process_cwd_full
+    // sequentially, but get_foreground_process was never registered as a
+    // Rust command, so the inheritance path always fell through. (#462)
     let cwd: string | undefined = restoreCwd;
     if (!cwd && this.activeTabId) {
       const activeTab = this.tabs.get(this.activeTabId);
       if (activeTab?.ptyPid) {
         try {
-          const timeout = this.config.advanced.ipcTimeoutMs;
-          const fg = await invokeWithTimeout<{ name: string; pid: number }>(
-            "get_foreground_process",
+          cwd = await invokeWithTimeout<string>(
+            "get_process_cwd_full",
             { pid: activeTab.ptyPid },
-            timeout,
+            this.config.advanced.ipcTimeoutMs,
           );
-          cwd = await invokeWithTimeout<string>("get_process_cwd_full", { pid: fg.pid }, timeout);
         } catch (e) {
           logger.debug("Failed to inherit CWD from active tab:", e);
         }
