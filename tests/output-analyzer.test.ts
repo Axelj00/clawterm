@@ -10,7 +10,7 @@ describe("OutputAnalyzer", () => {
   let events: Array<{ type: string; detail: string }>;
 
   beforeEach(() => {
-    analyzer = new OutputAnalyzer(4096);
+    analyzer = new OutputAnalyzer();
     events = [];
     analyzer.onEvent((e) => events.push({ type: e.type, detail: e.detail }));
   });
@@ -46,15 +46,6 @@ describe("OutputAnalyzer", () => {
     expect(events[0].type).toBe("server-started");
   });
 
-  it("maintains rolling buffer with max size", () => {
-    const analyzer = new OutputAnalyzer(100);
-    analyzer.onEvent(() => {});
-    const longText = "x".repeat(200);
-    analyzer.feed(toBytes(longText));
-    analyzer.flush();
-    expect(analyzer.getBuffer().length).toBe(100);
-  });
-
   it("detects patterns across chunk boundaries", () => {
     analyzer.feed(toBytes("Server listening on http://local"));
     analyzer.flush();
@@ -65,8 +56,10 @@ describe("OutputAnalyzer", () => {
     expect(events[0].type).toBe("server-started");
   });
 
-  it("cleanup on dispose", () => {
+  it("dispose stops emitting events", () => {
     analyzer.dispose();
-    expect(analyzer.getBuffer()).toBe("");
+    analyzer.feed(toBytes("FATAL: post-dispose\n"));
+    analyzer.flush();
+    expect(events.length).toBe(0);
   });
 });

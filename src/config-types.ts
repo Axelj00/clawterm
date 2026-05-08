@@ -60,7 +60,6 @@ export interface Config {
   maxPanes: number;
   outputAnalysis: {
     enabled: boolean;
-    bufferSize: number;
     customMatchers: UserMatcher[];
     /** Show event markers in the scrollbar gutter. Default: false (#349) */
     showEventGutter: boolean;

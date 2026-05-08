@@ -13,8 +13,6 @@ const MATCH_DEBOUNCE_MS = 100;
 const MAX_EVENT_HISTORY = 200;
 
 export class OutputAnalyzer {
-  private buffer = "";
-  private readonly bufferSize: number;
   private matchers: OutputMatcher[];
   private lastFired: Map<string, number> = new Map();
   private overlapWindow = "";
@@ -32,8 +30,7 @@ export class OutputAnalyzer {
   /** Total scrollback lines (set externally by Pane) */
   totalLines = 0;
 
-  constructor(bufferSize = 4096, customMatchers?: OutputMatcher[]) {
-    this.bufferSize = bufferSize;
+  constructor(customMatchers?: OutputMatcher[]) {
     this.matchers = customMatchers ?? DEFAULT_MATCHERS;
   }
 
@@ -53,11 +50,6 @@ export class OutputAnalyzer {
     this.matchTimer = null;
     const clean = this.pendingText.replace(ANSI_RE, "");
     this.pendingText = "";
-
-    this.buffer += clean;
-    if (this.buffer.length > this.bufferSize) {
-      this.buffer = this.buffer.slice(this.buffer.length - this.bufferSize);
-    }
 
     const rawMatchText = this.overlapWindow + clean;
     const matchText = rawMatchText.length > 2048 ? rawMatchText.slice(-2048) : rawMatchText;
@@ -102,17 +94,12 @@ export class OutputAnalyzer {
     }
   }
 
-  getBuffer(): string {
-    return this.buffer;
-  }
-
   dispose() {
     if (this.matchTimer) {
       clearTimeout(this.matchTimer);
       this.matchTimer = null;
     }
     this.listener = null;
-    this.buffer = "";
     this.pendingText = "";
     this.overlapWindow = "";
     this.lastFired.clear();

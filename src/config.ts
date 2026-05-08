@@ -132,7 +132,6 @@ export const DEFAULT_CONFIG: Config = {
   },
   outputAnalysis: {
     enabled: true,
-    bufferSize: 4096,
     customMatchers: [],
     showEventGutter: false,
   },

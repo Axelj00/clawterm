@@ -160,7 +160,7 @@ export class Pane {
       }
     }
 
-    this.analyzer = new OutputAnalyzer(config.outputAnalysis?.bufferSize ?? 4096, matchers);
+    this.analyzer = new OutputAnalyzer(matchers);
 
     this.terminal = new Terminal({
       cursorBlink: config.cursor.blink,
