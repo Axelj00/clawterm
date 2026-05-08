@@ -137,29 +137,11 @@
         0 0 120px var(--accent-glow),
         0 32px 64px rgba(0, 0, 0, 0.5);
     }
-    .demo-video video {
+    .demo-video img {
       display: block;
       width: 100%;
       height: auto;
     }
-
-    .demo-fallback {
-      display: none;
-      aspect-ratio: 16 / 10;
-      text-align: center;
-      padding: 32px;
-    }
-    .demo-fallback-tagline {
-      font-family: var(--mono);
-      font-size: 14px;
-      color: var(--text-dim);
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .demo-video.no-video video { display: none; }
-    .demo-video.no-video .demo-fallback { display: block; }
 
     /* ── Right: text ── */
     .text-side {
@@ -280,7 +262,6 @@
 
     /* ── Reduce motion ── */
     @media (prefers-reduced-motion: reduce) {
-      .demo-video video { animation: none; }
       *, *::before, *::after { transition-duration: 0.01ms !important; }
     }
   </style>
@@ -291,13 +272,8 @@
 
 <main class="page">
   <div class="video-side">
-    <div class="demo-video" id="demoVideo" role="img" aria-label="Clawterm demo showing multiple Claude Code terminals running side by side">
-      <video autoplay loop muted playsinline preload="metadata">
-        <source src="screenshots/Clawterm1080.mp4" type="video/mp4">
-      </video>
-      <div class="demo-fallback">
-        <p class="demo-fallback-tagline">Video demo unavailable</p>
-      </div>
+    <div class="demo-video">
+      <img src="screenshots/clawterm.png" alt="Clawterm showing multiple Claude Code terminals running side by side" loading="eager">
     </div>
   </div>
 
@@ -318,16 +294,6 @@
     <p class="license">MIT License &middot; Tauri 2 + xterm.js</p>
   </div>
 </main>
-
-<script>
-  var v = document.querySelector('#demoVideo video');
-  v.addEventListener('error', function() {
-    document.getElementById('demoVideo').classList.add('no-video');
-  });
-  v.querySelector('source').addEventListener('error', function() {
-    document.getElementById('demoVideo').classList.add('no-video');
-  });
-</script>
 
 </body>
 </html>
