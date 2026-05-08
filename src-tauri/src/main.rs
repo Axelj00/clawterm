@@ -304,6 +304,8 @@ fn main() {
             has_legacy_in_repo_worktrees,
             validate_shell,
             setup_claude_statusline,
+            #[cfg(target_os = "macos")]
+            menu::apply_menu_accelerators,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

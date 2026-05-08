@@ -49,6 +49,46 @@ function updateSidebarMode(width: number): void {
   sidebar.classList.toggle("sidebar-slim", width < 120);
 }
 
+/** Map config.keybindings keys → menu item IDs (#495). Used to mirror the
+ *  user's bindings into the macOS menu's accelerators on startup and on
+ *  every reload. Bindings that the menu can't parse are dropped on the
+ *  Rust side; the keybinding handler keeps firing on the raw key event. */
+const KEYBINDING_TO_MENU_ID: Record<string, string> = {
+  newTab: "createTab",
+  closeTab: "closeActiveTab",
+  nextTab: "nextTab",
+  prevTab: "prevTab",
+  reloadConfig: "reloadConfig",
+  cycleAttention: "cycleAttentionTabs",
+  search: "toggleSearch",
+  quickSwitch: "showQuickSwitch",
+  splitHorizontal: "splitHorizontal",
+  splitVertical: "splitVertical",
+  closePane: "closeActivePane",
+  focusNextPane: "focusNextPane",
+  focusPrevPane: "focusPrevPane",
+  commandPalette: "openCommandPalette",
+  zoomIn: "zoomIn",
+  zoomOut: "zoomOut",
+  zoomReset: "zoomReset",
+  restoreTab: "restoreClosedTab",
+  nextProject: "nextProject",
+  prevProject: "prevProject",
+  newProject: "newProject",
+  newWorktreeTab: "openWorktreeDialog",
+  toggleWorkspacePanel: "toggleWorkspacePanel",
+  jumpToBranch: "jumpToBranch",
+};
+
+function menuAcceleratorsForConfig(config: Config): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [bindingKey, menuId] of Object.entries(KEYBINDING_TO_MENU_ID)) {
+    const accel = (config.keybindings as Record<string, string>)[bindingKey];
+    if (accel) out[menuId] = accel;
+  }
+  return out;
+}
+
 export class TerminalManager {
   private tabs: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
@@ -1062,9 +1102,21 @@ export class TerminalManager {
     try {
       const { listen } = await import("@tauri-apps/api/event");
       this.unlistenMenu = await listen<string>("menu-action", (e) => this.dispatchMenuAction(e.payload));
+      this.applyMenuAccelerators();
     } catch (err) {
       logger.debug("menu-action listen failed:", err);
     }
+  }
+
+  /** Mirror config.keybindings into the macOS menu (#495). Called once at
+   *  startup and again on every config reload so the labels next to each
+   *  menu item track whatever the user has set. */
+  private applyMenuAccelerators() {
+    if (!isMac) return;
+    const accelerators = menuAcceleratorsForConfig(this.config);
+    invoke("apply_menu_accelerators", { accelerators }).catch((err) => {
+      logger.debug("apply_menu_accelerators failed:", err);
+    });
   }
 
   private dispatchMenuAction(id: string): void {
@@ -2159,6 +2211,7 @@ export class TerminalManager {
     this.startCentralPoll();
 
     this.renderTabList();
+    this.applyMenuAccelerators();
   }
 
   private pollCycleCount = 0;

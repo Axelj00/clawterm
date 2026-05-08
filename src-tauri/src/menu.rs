@@ -6,41 +6,59 @@
 //! surface used by the keybinding handler and command palette — there's
 //! one action map shared across all three input paths.
 //!
-//! Scope of this v1 (per the #487 close comment):
-//! - Static menu structure with all actions reachable
-//! - No accelerators — user keybindings still fire via the existing
-//!   keybinding handler; mirroring config.keybindings into menu
-//!   accelerators (and rebuilding on reload) is a follow-up
-//! - All custom items always enabled — handlers no-op when context is
-//!   wrong; context-aware dimming is a follow-up
-//! - Standard system items (Quit/Hide/Services/Window/Fullscreen) use
-//!   PredefinedMenuItem for free localization + role behavior
-//! - macOS only — gated by cfg in main.rs
+//! Accelerators are bound from `config.keybindings` via the
+//! `apply_menu_accelerators` command (#495). The frontend translates
+//! config keybinding names to menu item IDs and invokes the command on
+//! startup and on config reload, which rebuilds the menu in place. If a
+//! binding string can't be parsed (e.g. compound resize chords) the menu
+//! item is built without an accelerator and the keybinding handler keeps
+//! handling the raw key event.
+//!
+//! Standard Window/App items use `PredefinedMenuItem` for free
+//! localization + role behavior. macOS only — gated by cfg in main.rs.
 //!
 //! Edit menu cut/copy/paste/selectAll dispatch through custom IDs so
 //! they reach the focused pane's xterm (or text input) rather than
 //! relying on the macOS responder chain (#497).
 
+use std::collections::HashMap;
 use tauri::{
-    menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    menu::{Menu, MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
     AppHandle, Emitter, Runtime,
 };
 
-/// Build and attach the macOS menu bar. Idempotent — call once on setup.
+/// Build and attach the macOS menu bar with no accelerators. Call once on
+/// setup; the frontend follows up with `apply_menu_accelerators` once it
+/// has loaded `config.keybindings`.
 pub fn build_and_set<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let menu = build_menu(app)?;
+    let menu = build_menu(app, &HashMap::new())?;
     app.set_menu(menu)?;
     Ok(())
 }
 
-fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+/// Rebuild the menu with accelerators bound from `config.keybindings`.
+/// Called by the frontend on startup and on config reload (#495).
+#[tauri::command]
+pub fn apply_menu_accelerators<R: Runtime>(
+    app: AppHandle<R>,
+    accelerators: HashMap<String, String>,
+) -> Result<(), String> {
+    let menu = build_menu(&app, &accelerators).map_err(|e| e.to_string())?;
+    app.set_menu(menu).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn build_menu<R: Runtime>(
+    app: &AppHandle<R>,
+    accels: &HashMap<String, String>,
+) -> tauri::Result<Menu<R>> {
     let app_submenu = SubmenuBuilder::new(app, "Clawterm")
-        .item(&MenuItemBuilder::with_id("about", "About Clawterm").build(app)?)
-        .item(&MenuItemBuilder::with_id("checkForUpdates", "Check for Updates…").build(app)?)
+        .item(&item(app, "about", "About Clawterm", accels)?)
+        .item(&item(app, "checkForUpdates", "Check for Updates…", accels)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("toggleSettings", "Settings…").build(app)?)
-        .item(&MenuItemBuilder::with_id("openConfigFile", "Open Config File…").build(app)?)
-        .item(&MenuItemBuilder::with_id("reloadConfig", "Reload Config").build(app)?)
+        .item(&item(app, "toggleSettings", "Settings…", accels)?)
+        .item(&item(app, "openConfigFile", "Open Config File…", accels)?)
+        .item(&item(app, "reloadConfig", "Reload Config", accels)?)
         .separator()
         .item(&PredefinedMenuItem::services(app, None)?)
         .separator()
@@ -52,57 +70,60 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
 
     let file_submenu = SubmenuBuilder::new(app, "File")
-        .item(&MenuItemBuilder::with_id("createTab", "New Tab").build(app)?)
-        .item(&MenuItemBuilder::with_id("openWorktreeDialog", "New Agent Tab on Branch…").build(app)?)
-        .item(&MenuItemBuilder::with_id("newProject", "New Project").build(app)?)
+        .item(&item(app, "createTab", "New Tab", accels)?)
+        .item(&item(app, "openWorktreeDialog", "New Agent Tab on Branch…", accels)?)
+        .item(&item(app, "newProject", "New Project", accels)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("restoreClosedTab", "Restore Closed Tab").build(app)?)
+        .item(&item(app, "restoreClosedTab", "Restore Closed Tab", accels)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("closeActivePane", "Close Pane").build(app)?)
-        .item(&MenuItemBuilder::with_id("closeActiveTab", "Close Tab").build(app)?)
+        .item(&item(app, "closeActivePane", "Close Pane", accels)?)
+        .item(&item(app, "closeActiveTab", "Close Tab", accels)?)
         .build()?;
 
+    // Edit menu accelerators are standard macOS bindings and not driven by
+    // config.keybindings — they're fixed strings that the dispatcher routes
+    // to xterm or the focused text input (#497).
     let edit_submenu = SubmenuBuilder::new(app, "Edit")
         .item(&MenuItemBuilder::with_id("editCut", "Cut").accelerator("CmdOrCtrl+X").build(app)?)
         .item(&MenuItemBuilder::with_id("editCopy", "Copy").accelerator("CmdOrCtrl+C").build(app)?)
         .item(&MenuItemBuilder::with_id("editPaste", "Paste").accelerator("CmdOrCtrl+V").build(app)?)
         .item(&MenuItemBuilder::with_id("editSelectAll", "Select All").accelerator("CmdOrCtrl+A").build(app)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("toggleSearch", "Find…").build(app)?)
+        .item(&item(app, "toggleSearch", "Find…", accels)?)
         .build()?;
 
     let view_submenu = SubmenuBuilder::new(app, "View")
-        .item(&MenuItemBuilder::with_id("zoomIn", "Zoom In").build(app)?)
-        .item(&MenuItemBuilder::with_id("zoomOut", "Zoom Out").build(app)?)
-        .item(&MenuItemBuilder::with_id("zoomReset", "Reset Zoom").build(app)?)
+        .item(&item(app, "zoomIn", "Zoom In", accels)?)
+        .item(&item(app, "zoomOut", "Zoom Out", accels)?)
+        .item(&item(app, "zoomReset", "Reset Zoom", accels)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("toggleWorkspacePanel", "Toggle Workspace Panel").build(app)?)
+        .item(&item(app, "toggleWorkspacePanel", "Toggle Workspace Panel", accels)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("openCommandPalette", "Show Command Palette").build(app)?)
-        .item(&MenuItemBuilder::with_id("showQuickSwitch", "Quick Switch").build(app)?)
-        .item(&MenuItemBuilder::with_id("jumpToBranch", "Jump to Branch…").build(app)?)
-        .item(&MenuItemBuilder::with_id("cycleAttentionTabs", "Cycle Attention Tabs").build(app)?)
+        .item(&item(app, "openCommandPalette", "Show Command Palette", accels)?)
+        .item(&item(app, "showQuickSwitch", "Quick Switch", accels)?)
+        .item(&item(app, "jumpToBranch", "Jump to Branch…", accels)?)
+        .item(&item(app, "cycleAttentionTabs", "Cycle Attention Tabs", accels)?)
         .separator()
         .item(&PredefinedMenuItem::fullscreen(app, None)?)
         .build()?;
 
     let tab_submenu = SubmenuBuilder::new(app, "Tab")
-        .item(&MenuItemBuilder::with_id("nextTab", "Next Tab").build(app)?)
-        .item(&MenuItemBuilder::with_id("prevTab", "Previous Tab").build(app)?)
+        .item(&item(app, "nextTab", "Next Tab", accels)?)
+        .item(&item(app, "prevTab", "Previous Tab", accels)?)
         .build()?;
 
     let pane_submenu = SubmenuBuilder::new(app, "Pane")
-        .item(&MenuItemBuilder::with_id("splitVertical", "Split Right").build(app)?)
-        .item(&MenuItemBuilder::with_id("splitHorizontal", "Split Down").build(app)?)
+        .item(&item(app, "splitVertical", "Split Right", accels)?)
+        .item(&item(app, "splitHorizontal", "Split Down", accels)?)
         .separator()
-        .item(&MenuItemBuilder::with_id("focusNextPane", "Focus Next Pane").build(app)?)
-        .item(&MenuItemBuilder::with_id("focusPrevPane", "Focus Previous Pane").build(app)?)
+        .item(&item(app, "focusNextPane", "Focus Next Pane", accels)?)
+        .item(&item(app, "focusPrevPane", "Focus Previous Pane", accels)?)
         .build()?;
 
     let project_submenu = SubmenuBuilder::new(app, "Project")
-        .item(&MenuItemBuilder::with_id("newProject", "New Project").build(app)?)
-        .item(&MenuItemBuilder::with_id("nextProject", "Next Project").build(app)?)
-        .item(&MenuItemBuilder::with_id("prevProject", "Previous Project").build(app)?)
+        .item(&item(app, "newProject", "New Project", accels)?)
+        .item(&item(app, "nextProject", "Next Project", accels)?)
+        .item(&item(app, "prevProject", "Previous Project", accels)?)
         .build()?;
 
     let window_submenu = SubmenuBuilder::new(app, "Window")
@@ -113,9 +134,9 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
 
     let help_submenu = SubmenuBuilder::new(app, "Help")
-        .item(&MenuItemBuilder::with_id("openDocs", "Clawterm Documentation").build(app)?)
-        .item(&MenuItemBuilder::with_id("reportIssue", "Report an Issue").build(app)?)
-        .item(&MenuItemBuilder::with_id("showShortcuts", "Show Keyboard Shortcuts").build(app)?)
+        .item(&item(app, "openDocs", "Clawterm Documentation", accels)?)
+        .item(&item(app, "reportIssue", "Report an Issue", accels)?)
+        .item(&item(app, "showShortcuts", "Show Keyboard Shortcuts", accels)?)
         .build()?;
 
     MenuBuilder::new(app)
@@ -131,6 +152,25 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &help_submenu,
         ])
         .build()
+}
+
+/// Build a custom menu item, attaching an accelerator from `accels` if one
+/// is present and parses cleanly. If Tauri rejects the accelerator string,
+/// fall back to the no-accelerator item — the keybinding handler keeps
+/// firing on the raw key event regardless.
+fn item<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    label: &str,
+    accels: &HashMap<String, String>,
+) -> tauri::Result<MenuItem<R>> {
+    let accel = accels.get(id).map(String::as_str).filter(|s| !s.is_empty());
+    if let Some(a) = accel {
+        if let Ok(item) = MenuItemBuilder::with_id(id, label).accelerator(a).build(app) {
+            return Ok(item);
+        }
+    }
+    MenuItemBuilder::with_id(id, label).build(app)
 }
 
 /// Forward custom menu item clicks to the frontend. Predefined items
