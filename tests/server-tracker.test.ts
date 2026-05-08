@@ -106,4 +106,47 @@ describe("ServerTracker", () => {
     tracker.dispose();
     expect(tracker.getAllServers()).toHaveLength(0);
   });
+
+  it("does not fire crash for a server removed mid-flight", async () => {
+    const crashHandler = vi.fn();
+    tracker.onServerCrash(crashHandler);
+    tracker.addServer("tab-1", 3000);
+
+    // IPC resolves only after we remove the server.
+    let resolveCheck!: (alive: boolean) => void;
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((r) => {
+          resolveCheck = (alive: boolean) => r(alive);
+        }) as Promise<unknown>,
+    );
+
+    await vi.advanceTimersByTimeAsync(1000);
+    tracker.removeServer("tab-1");
+    resolveCheck(false);
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(crashHandler).not.toHaveBeenCalled();
+  });
+
+  it("does not fire crash after dispose, even if IPC was in flight", async () => {
+    const crashHandler = vi.fn();
+    tracker.onServerCrash(crashHandler);
+    tracker.addServer("tab-1", 3000);
+
+    let resolveCheck!: (alive: boolean) => void;
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((r) => {
+          resolveCheck = (alive: boolean) => r(alive);
+        }) as Promise<unknown>,
+    );
+
+    await vi.advanceTimersByTimeAsync(1000);
+    tracker.dispose();
+    resolveCheck(false);
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(crashHandler).not.toHaveBeenCalled();
+  });
 });

@@ -61,6 +61,10 @@ export class ServerTracker {
           { port: server.port },
           this.ipcTimeoutMs,
         );
+        // Re-check after await: tracker may have been disposed or the server
+        // removed (tab closed) while the IPC was in flight. Either path can
+        // produce a phantom onCrash on a destroyed Tab.
+        if (this.disposed || this.servers.get(tabId) !== server) return;
         if (!alive && server.healthy) {
           server.healthy = false;
           this.onCrash?.(tabId, server.port);
