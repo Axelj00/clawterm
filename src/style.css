@@ -34,10 +34,9 @@
   --red-muted: rgba(229, 72, 77, 0.3);
   --orange-muted: rgba(245, 166, 35, 0.3);
 
-  /* Claude/agent signal colors — semantic intent TBD as part of the brand
-     book in #494. Tokenized here so #493's lint guard passes; the values
-     match the previously-hardcoded callsites and may be replaced or
-     renamed once the brand decision lands. */
+  /* Claude / agent signal colors. See docs/brand.md for semantic intent —
+     purple is the single special-case hue for compaction signals; the
+     info / warn badges back the footer effort badges. */
   --color-purple-signal: #bf7af0;
   --badge-info-text: #a8c0ff;
   --badge-info-bg: rgba(95, 135, 255, 0.18);
@@ -478,7 +477,7 @@ body {
 .tab-entry {
   display: flex;
   flex-direction: column;
-  padding: var(--space-3) var(--space-3);
+  padding: var(--space-3);
   cursor: pointer;
   color: var(--text-secondary);
   font-size: var(--font-md);
@@ -2189,7 +2188,7 @@ body {
   background: var(--bg-base);
   border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-4);
+  padding: var(--space-4);
   margin-bottom: var(--space-4);
   max-height: 40vh;
   overflow-y: auto;
@@ -2361,7 +2360,7 @@ body {
   background: var(--overlay-backdrop);
   border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-4);
+  padding: var(--space-4);
   margin-bottom: var(--space-5);
   font-size: var(--font-sm);
   line-height: 1.4;

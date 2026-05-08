@@ -14,7 +14,7 @@ violations=$(grep -rn "ClawTerm" \
   --include="*.rs" --include="*.yml" --include="*.yaml" \
   --exclude-dir=node_modules --exclude-dir=target --exclude-dir=dist \
   --exclude-dir=.git --exclude-dir=.clawterm-worktrees \
-  . 2>/dev/null | grep -v '^./docs/brand\.md:' || true)
+  . 2>/dev/null | grep -v '^\./docs/brand\.md:' || true)
 
 if [ -n "$violations" ]; then
   echo "❌ Use 'Clawterm' (lowercase t) — see docs/brand.md:" >&2

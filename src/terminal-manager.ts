@@ -2,7 +2,14 @@ import { Tab } from "./tab";
 import { loadConfig, applyConfigToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { invokeWithTimeout, trapFocus, isMac, getLiveCwd } from "./utils";
+import {
+  copyToClipboard,
+  getLiveCwd,
+  invokeWithTimeout,
+  isMac,
+  isTextInputFocused,
+  trapFocus,
+} from "./utils";
 import { WorkspacePanel } from "./workspace-panel";
 import {
   openWorktreeDialog as worktreeOpenDialog,
@@ -49,11 +56,11 @@ function updateSidebarMode(width: number): void {
   sidebar.classList.toggle("sidebar-slim", width < 120);
 }
 
-/** Map config.keybindings keys → menu item IDs (#495). Used to mirror the
- *  user's bindings into the macOS menu's accelerators on startup and on
- *  every reload. Bindings that the menu can't parse are dropped on the
- *  Rust side; the keybinding handler keeps firing on the raw key event. */
-const KEYBINDING_TO_MENU_ID: Record<string, string> = {
+/** Map config.keybindings keys → menu item IDs. Used to mirror the user's
+ *  bindings into the macOS menu's accelerators on startup and on every
+ *  reload. Bindings the menu can't parse are dropped on the Rust side;
+ *  the keybinding handler keeps firing on the raw key event. */
+const KEYBINDING_TO_MENU_ID: Record<keyof Config["keybindings"], string> = {
   newTab: "createTab",
   closeTab: "closeActiveTab",
   nextTab: "nextTab",
@@ -82,9 +89,9 @@ const KEYBINDING_TO_MENU_ID: Record<string, string> = {
 
 function menuAcceleratorsForConfig(config: Config): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [bindingKey, menuId] of Object.entries(KEYBINDING_TO_MENU_ID)) {
-    const accel = (config.keybindings as Record<string, string>)[bindingKey];
-    if (accel) out[menuId] = accel;
+  for (const bindingKey of Object.keys(KEYBINDING_TO_MENU_ID) as (keyof Config["keybindings"])[]) {
+    const accel = config.keybindings[bindingKey];
+    if (accel) out[KEYBINDING_TO_MENU_ID[bindingKey]] = accel;
   }
   return out;
 }
@@ -121,6 +128,7 @@ export class TerminalManager {
   private handleKey!: (e: KeyboardEvent) => boolean;
   private menuActions!: KeybindingActions;
   private unlistenMenu: (() => void) | null = null;
+  private lastMenuDisabled = "";
   private closedTabStack: { cwd: string; title?: string }[] = [];
   private workspacePanel!: WorkspacePanel;
   /** Debounced config write — coalesces rapid changes (zoom, sidebar drag) */
@@ -1109,9 +1117,9 @@ export class TerminalManager {
     }
   }
 
-  /** Mirror config.keybindings into the macOS menu (#495). Called once at
-   *  startup and again on every config reload so the labels next to each
-   *  menu item track whatever the user has set. */
+  /** Mirror config.keybindings into the macOS menu. Called once at startup
+   *  and again on every config reload so the labels next to each menu
+   *  item track whatever the user has set. */
   private applyMenuAccelerators() {
     if (!isMac) return;
     const accelerators = menuAcceleratorsForConfig(this.config);
@@ -1121,9 +1129,9 @@ export class TerminalManager {
   }
 
   /** Compute the set of menu items that should appear dimmed for the
-   *  current context, and push it to the macOS menu (#496). Piggybacks
-   *  on scheduleRender's rAF debounce — the Rust side also no-ops if the
-   *  set hasn't changed, so identical updates are cheap. */
+   *  current context, and push it to the macOS menu. Piggybacks on
+   *  scheduleRender's rAF debounce; an identical-set guard short-circuits
+   *  the IPC before it crosses the bridge. */
   private updateMenuDisabled() {
     if (!isMac) return;
     const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
@@ -1150,6 +1158,10 @@ export class TerminalManager {
     }
     if (this.closedTabStack.length === 0) disabled.push("restoreClosedTab");
     if (this.projects.length <= 1) disabled.push("nextProject", "prevProject");
+    // rAF debounce — skip the IPC if nothing about the menu state changed.
+    const key = disabled.join("|");
+    if (key === this.lastMenuDisabled) return;
+    this.lastMenuDisabled = key;
     invoke("apply_menu_disabled", { disabled }).catch((err) => {
       logger.debug("apply_menu_disabled failed:", err);
     });
@@ -1186,15 +1198,14 @@ export class TerminalManager {
     }
   }
 
-  /** Edit menu (#497). When a text input has focus (settings, search bar,
-   *  command palette), use the browser's native edit semantics. Otherwise
-   *  route to the focused pane's xterm. */
+  /** Edit menu. When a text input has focus (settings, search bar, command
+   *  palette), use the browser's native edit semantics. Otherwise route to
+   *  the focused pane's xterm. */
   private dispatchEditAction(id: string): void {
-    const el = document.activeElement as HTMLElement | null;
-    const inText = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
-    if (inText) {
-      if (id === "editSelectAll" && (el as HTMLInputElement).select) {
-        (el as HTMLInputElement).select();
+    if (isTextInputFocused()) {
+      const el = document.activeElement;
+      if (id === "editSelectAll" && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+        el.select();
       } else if (id === "editPaste") {
         navigator.clipboard.readText().then(
           (text) => document.execCommand("insertText", false, text),
@@ -1205,14 +1216,11 @@ export class TerminalManager {
       }
       return;
     }
-    const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
-    const pane = tab?.getFocusedPane();
+    const pane = this.activeTabId ? this.tabs.get(this.activeTabId)?.getFocusedPane() : null;
     if (!pane) return;
     if (id === "editSelectAll") {
-      pane.terminal.selectAll();
-      return;
-    }
-    if (id === "editPaste") {
+      pane.selectAll();
+    } else if (id === "editPaste") {
       navigator.clipboard.readText().then(
         (text) => pane.requestPaste(text),
         (e) => {
@@ -1220,15 +1228,11 @@ export class TerminalManager {
           showToast("Failed to read clipboard", "error");
         },
       );
-      return;
+    } else {
+      // editCopy / editCut — terminal has no cut concept; both copy the selection.
+      const sel = pane.getSelection();
+      if (sel) copyToClipboard(sel);
     }
-    // editCopy / editCut — terminal has no cut concept; both copy the selection.
-    const sel = pane.terminal.getSelection();
-    if (!sel) return;
-    navigator.clipboard.writeText(sel).catch((e) => {
-      logger.debug("Clipboard write failed:", e);
-      showToast("Failed to copy to clipboard", "error");
-    });
   }
 
   private toggleSettingsPanel() {

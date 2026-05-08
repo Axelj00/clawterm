@@ -222,8 +222,6 @@ export class Tab {
     return this.focusedPane;
   }
 
-  /** Total panes in this tab — used by the macOS menu to dim "Close Pane"
-   *  when only one pane is open (#496). */
   get paneCount(): number {
     return this.panes.length;
   }

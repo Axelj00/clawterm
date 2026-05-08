@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { logger } from "./logger";
+import { showToast } from "./toast";
 
 /**
  * Invoke a Tauri command with a timeout. Rejects if the command
@@ -53,6 +54,28 @@ export const modKey = isMac ? "cmd" : "ctrl";
 /** Check the platform-appropriate primary modifier on a keyboard event */
 export function isPrimaryMod(e: KeyboardEvent): boolean {
   return isMac ? e.metaKey : e.ctrlKey;
+}
+
+/** True when the document's currently focused element is a text input —
+ *  used by the macOS Edit menu and global shortcuts to decide whether
+ *  cut/copy/paste should target the WebView or the focused xterm. */
+export function isTextInputFocused(): boolean {
+  const el = document.activeElement;
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    (el instanceof HTMLElement && el.isContentEditable)
+  );
+}
+
+/** Write text to the clipboard, showing a generic error toast on failure.
+ *  Centralizes the pane copy-on-select / context-menu copy / Edit-menu
+ *  copy paths so they stay in lockstep. */
+export function copyToClipboard(text: string): Promise<void> {
+  return navigator.clipboard.writeText(text).catch((e) => {
+    logger.debug("Clipboard write failed:", e);
+    showToast("Failed to copy to clipboard", "error");
+  });
 }
 
 /**

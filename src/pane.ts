@@ -18,7 +18,7 @@ import { logger } from "./logger";
 import { showToast } from "./toast";
 import { showContextMenu } from "./context-menu";
 import { FileLinkProvider } from "./file-link-provider";
-import { isPrimaryMod, isWindows } from "./utils";
+import { copyToClipboard, isPrimaryMod, isWindows } from "./utils";
 import { showPasteConfirm as showPasteDialog } from "./paste-confirm";
 
 export type KeyHandler = (e: KeyboardEvent) => boolean;
@@ -327,12 +327,7 @@ export class Pane {
       this.disposables.push(
         this.terminal.onSelectionChange(() => {
           const selection = this.terminal.getSelection();
-          if (selection) {
-            navigator.clipboard.writeText(selection).catch((e) => {
-              logger.debug("Clipboard write failed:", e);
-              showToast("Failed to copy to clipboard", "error");
-            });
-          }
+          if (selection) copyToClipboard(selection);
         }),
       );
     }
@@ -348,11 +343,7 @@ export class Pane {
             label: "Copy",
             disabled: !selection,
             action: () => {
-              if (selection)
-                navigator.clipboard.writeText(selection).catch((e) => {
-                  logger.debug("Clipboard write failed:", e);
-                  showToast("Failed to copy to clipboard", "error");
-                });
+              if (selection) copyToClipboard(selection);
             },
           },
           {
@@ -967,9 +958,9 @@ export class Pane {
     });
   }
 
-  /** Public paste entrypoint used by the macOS Edit > Paste menu (#497) and
-   *  the right-click context menu — same multi-line gating as the keyboard
-   *  paste handler at line 392. */
+  /** Public paste entrypoint — applies the same multi-line gate as the
+   *  keyboard paste handler, so the macOS Edit menu and right-click menu
+   *  can't bypass the paste-confirm dialog. */
   requestPaste(text: string): void {
     if (!text || this.disposed) return;
     if (text.includes("\n") && !this.terminal.modes.bracketedPasteMode) {
@@ -977,6 +968,16 @@ export class Pane {
     } else {
       this.terminal.paste(text);
     }
+  }
+
+  /** Public selection accessors so callers (Edit menu, context menu) don't
+   *  need to reach into `pane.terminal` directly. */
+  getSelection(): string {
+    return this.terminal.getSelection();
+  }
+
+  selectAll(): void {
+    this.terminal.selectAll();
   }
 
   /** Shared scroll state update — called from both terminal.onScroll (buffer

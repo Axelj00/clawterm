@@ -51,6 +51,9 @@ pub fn apply_menu_accelerators<R: Runtime>(
     accelerators: HashMap<String, String>,
 ) -> Result<(), String> {
     let mut ctx = state.lock().map_err(|e| e.to_string())?;
+    if accelerators == ctx.accelerators {
+        return Ok(());
+    }
     ctx.accelerators = accelerators;
     rebuild(&app, &ctx).map_err(|e| e.to_string())
 }

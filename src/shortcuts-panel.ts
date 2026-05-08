@@ -3,6 +3,7 @@ import { eventToBinding, isUnbound } from "./config";
 import { modLabel } from "./utils";
 import { manualCheckForUpdates } from "./updater";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { logger } from "./logger";
 
 declare const __APP_VERSION__: string;
 
@@ -160,7 +161,7 @@ export function createSettingsPanel(opts: PanelOptions): ShortcutsPanel {
     "click",
     (e) => {
       e.preventDefault();
-      openUrl(repoLink.href).catch(() => {});
+      openUrl(repoLink.href).catch((err) => logger.debug("Failed to open repo URL:", err));
     },
     { signal: panelSignal },
   );
