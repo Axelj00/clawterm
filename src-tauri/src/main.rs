@@ -271,6 +271,8 @@ fn main() {
         .setup(|_app| {
             #[cfg(target_os = "macos")]
             {
+                use tauri::Manager;
+                _app.manage(menu::MenuState::default());
                 let handle = _app.handle().clone();
                 menu::build_and_set(&handle)?;
             }
@@ -306,6 +308,8 @@ fn main() {
             setup_claude_statusline,
             #[cfg(target_os = "macos")]
             menu::apply_menu_accelerators,
+            #[cfg(target_os = "macos")]
+            menu::apply_menu_disabled,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

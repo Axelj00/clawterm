@@ -222,6 +222,12 @@ export class Tab {
     return this.focusedPane;
   }
 
+  /** Total panes in this tab — used by the macOS menu to dim "Close Pane"
+   *  when only one pane is open (#496). */
+  get paneCount(): number {
+    return this.panes.length;
+  }
+
   /** Split the focused pane with a specific CWD (used for split-to-branch) */
   async splitWithCwd(direction: SplitDirection, cwd: string): Promise<void> {
     await this.splitInternal(direction, cwd);

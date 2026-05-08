@@ -1103,6 +1103,7 @@ export class TerminalManager {
       const { listen } = await import("@tauri-apps/api/event");
       this.unlistenMenu = await listen<string>("menu-action", (e) => this.dispatchMenuAction(e.payload));
       this.applyMenuAccelerators();
+      this.updateMenuDisabled();
     } catch (err) {
       logger.debug("menu-action listen failed:", err);
     }
@@ -1116,6 +1117,41 @@ export class TerminalManager {
     const accelerators = menuAcceleratorsForConfig(this.config);
     invoke("apply_menu_accelerators", { accelerators }).catch((err) => {
       logger.debug("apply_menu_accelerators failed:", err);
+    });
+  }
+
+  /** Compute the set of menu items that should appear dimmed for the
+   *  current context, and push it to the macOS menu (#496). Piggybacks
+   *  on scheduleRender's rAF debounce — the Rust side also no-ops if the
+   *  set hasn't changed, so identical updates are cheap. */
+  private updateMenuDisabled() {
+    if (!isMac) return;
+    const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
+    const disabled: string[] = [];
+    if (!tab) {
+      disabled.push(
+        "closeActiveTab",
+        "closeActivePane",
+        "splitVertical",
+        "splitHorizontal",
+        "focusNextPane",
+        "focusPrevPane",
+        "toggleSearch",
+        "editCut",
+        "editCopy",
+        "editPaste",
+        "editSelectAll",
+      );
+    } else if (tab.paneCount <= 1) {
+      disabled.push("closeActivePane");
+    }
+    if (!tab?.state.gitBranch) {
+      disabled.push("openWorktreeDialog", "jumpToBranch", "toggleWorkspacePanel");
+    }
+    if (this.closedTabStack.length === 0) disabled.push("restoreClosedTab");
+    if (this.projects.length <= 1) disabled.push("nextProject", "prevProject");
+    invoke("apply_menu_disabled", { disabled }).catch((err) => {
+      logger.debug("apply_menu_disabled failed:", err);
     });
   }
 
@@ -2097,6 +2133,7 @@ export class TerminalManager {
       this.renderRaf = 0;
       this.renderTabList();
       this.updateStatusBar();
+      this.updateMenuDisabled();
     });
   }
 

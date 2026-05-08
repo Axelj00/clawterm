@@ -6,13 +6,11 @@
 //! surface used by the keybinding handler and command palette — there's
 //! one action map shared across all three input paths.
 //!
-//! Accelerators are bound from `config.keybindings` via the
-//! `apply_menu_accelerators` command (#495). The frontend translates
-//! config keybinding names to menu item IDs and invokes the command on
-//! startup and on config reload, which rebuilds the menu in place. If a
-//! binding string can't be parsed (e.g. compound resize chords) the menu
-//! item is built without an accelerator and the keybinding handler keeps
-//! handling the raw key event.
+//! Menu state — accelerators (#495) and disabled set (#496) — lives in a
+//! `MenuContext` mutex managed by Tauri. Each command updates one piece
+//! and rebuilds the whole menu; the menu is small enough (~30 items) that
+//! a full rebuild is cheaper than tracking per-item handles, and avoids
+//! the lifetime headache of stashing `MenuItem<R>` across calls.
 //!
 //! Standard Window/App items use `PredefinedMenuItem` for free
 //! localization + role behavior. macOS only — gated by cfg in main.rs.
@@ -21,44 +19,71 @@
 //! they reach the focused pane's xterm (or text input) rather than
 //! relying on the macOS responder chain (#497).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
-    AppHandle, Emitter, Runtime,
+    AppHandle, Emitter, Runtime, State,
 };
 
-/// Build and attach the macOS menu bar with no accelerators. Call once on
-/// setup; the frontend follows up with `apply_menu_accelerators` once it
-/// has loaded `config.keybindings`.
+#[derive(Default)]
+pub struct MenuContext {
+    accelerators: HashMap<String, String>,
+    disabled: HashSet<String>,
+}
+
+pub type MenuState = Mutex<MenuContext>;
+
+/// Build and attach the macOS menu bar with no accelerators and nothing
+/// disabled. Frontend follows up with `apply_menu_accelerators` and
+/// `apply_menu_disabled` once it has loaded config and computed context.
 pub fn build_and_set<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let menu = build_menu(app, &HashMap::new())?;
+    let ctx = MenuContext::default();
+    let menu = build_menu(app, &ctx)?;
     app.set_menu(menu)?;
     Ok(())
 }
 
-/// Rebuild the menu with accelerators bound from `config.keybindings`.
-/// Called by the frontend on startup and on config reload (#495).
 #[tauri::command]
 pub fn apply_menu_accelerators<R: Runtime>(
     app: AppHandle<R>,
+    state: State<'_, MenuState>,
     accelerators: HashMap<String, String>,
 ) -> Result<(), String> {
-    let menu = build_menu(&app, &accelerators).map_err(|e| e.to_string())?;
-    app.set_menu(menu).map_err(|e| e.to_string())?;
+    let mut ctx = state.lock().map_err(|e| e.to_string())?;
+    ctx.accelerators = accelerators;
+    rebuild(&app, &ctx).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn apply_menu_disabled<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MenuState>,
+    disabled: Vec<String>,
+) -> Result<(), String> {
+    let mut ctx = state.lock().map_err(|e| e.to_string())?;
+    let next: HashSet<String> = disabled.into_iter().collect();
+    if next == ctx.disabled {
+        return Ok(()); // No-op skip — rAF debounce can fire identical sets.
+    }
+    ctx.disabled = next;
+    rebuild(&app, &ctx).map_err(|e| e.to_string())
+}
+
+fn rebuild<R: Runtime>(app: &AppHandle<R>, ctx: &MenuContext) -> tauri::Result<()> {
+    let menu = build_menu(app, ctx)?;
+    app.set_menu(menu)?;
     Ok(())
 }
 
-fn build_menu<R: Runtime>(
-    app: &AppHandle<R>,
-    accels: &HashMap<String, String>,
-) -> tauri::Result<Menu<R>> {
+fn build_menu<R: Runtime>(app: &AppHandle<R>, ctx: &MenuContext) -> tauri::Result<Menu<R>> {
     let app_submenu = SubmenuBuilder::new(app, "Clawterm")
-        .item(&item(app, "about", "About Clawterm", accels)?)
-        .item(&item(app, "checkForUpdates", "Check for Updates…", accels)?)
+        .item(&item(app, "about", "About Clawterm", ctx)?)
+        .item(&item(app, "checkForUpdates", "Check for Updates…", ctx)?)
         .separator()
-        .item(&item(app, "toggleSettings", "Settings…", accels)?)
-        .item(&item(app, "openConfigFile", "Open Config File…", accels)?)
-        .item(&item(app, "reloadConfig", "Reload Config", accels)?)
+        .item(&item(app, "toggleSettings", "Settings…", ctx)?)
+        .item(&item(app, "openConfigFile", "Open Config File…", ctx)?)
+        .item(&item(app, "reloadConfig", "Reload Config", ctx)?)
         .separator()
         .item(&PredefinedMenuItem::services(app, None)?)
         .separator()
@@ -70,60 +95,60 @@ fn build_menu<R: Runtime>(
         .build()?;
 
     let file_submenu = SubmenuBuilder::new(app, "File")
-        .item(&item(app, "createTab", "New Tab", accels)?)
-        .item(&item(app, "openWorktreeDialog", "New Agent Tab on Branch…", accels)?)
-        .item(&item(app, "newProject", "New Project", accels)?)
+        .item(&item(app, "createTab", "New Tab", ctx)?)
+        .item(&item(app, "openWorktreeDialog", "New Agent Tab on Branch…", ctx)?)
+        .item(&item(app, "newProject", "New Project", ctx)?)
         .separator()
-        .item(&item(app, "restoreClosedTab", "Restore Closed Tab", accels)?)
+        .item(&item(app, "restoreClosedTab", "Restore Closed Tab", ctx)?)
         .separator()
-        .item(&item(app, "closeActivePane", "Close Pane", accels)?)
-        .item(&item(app, "closeActiveTab", "Close Tab", accels)?)
+        .item(&item(app, "closeActivePane", "Close Pane", ctx)?)
+        .item(&item(app, "closeActiveTab", "Close Tab", ctx)?)
         .build()?;
 
     // Edit menu accelerators are standard macOS bindings and not driven by
     // config.keybindings — they're fixed strings that the dispatcher routes
     // to xterm or the focused text input (#497).
     let edit_submenu = SubmenuBuilder::new(app, "Edit")
-        .item(&MenuItemBuilder::with_id("editCut", "Cut").accelerator("CmdOrCtrl+X").build(app)?)
-        .item(&MenuItemBuilder::with_id("editCopy", "Copy").accelerator("CmdOrCtrl+C").build(app)?)
-        .item(&MenuItemBuilder::with_id("editPaste", "Paste").accelerator("CmdOrCtrl+V").build(app)?)
-        .item(&MenuItemBuilder::with_id("editSelectAll", "Select All").accelerator("CmdOrCtrl+A").build(app)?)
+        .item(&edit_item(app, "editCut", "Cut", "CmdOrCtrl+X", ctx)?)
+        .item(&edit_item(app, "editCopy", "Copy", "CmdOrCtrl+C", ctx)?)
+        .item(&edit_item(app, "editPaste", "Paste", "CmdOrCtrl+V", ctx)?)
+        .item(&edit_item(app, "editSelectAll", "Select All", "CmdOrCtrl+A", ctx)?)
         .separator()
-        .item(&item(app, "toggleSearch", "Find…", accels)?)
+        .item(&item(app, "toggleSearch", "Find…", ctx)?)
         .build()?;
 
     let view_submenu = SubmenuBuilder::new(app, "View")
-        .item(&item(app, "zoomIn", "Zoom In", accels)?)
-        .item(&item(app, "zoomOut", "Zoom Out", accels)?)
-        .item(&item(app, "zoomReset", "Reset Zoom", accels)?)
+        .item(&item(app, "zoomIn", "Zoom In", ctx)?)
+        .item(&item(app, "zoomOut", "Zoom Out", ctx)?)
+        .item(&item(app, "zoomReset", "Reset Zoom", ctx)?)
         .separator()
-        .item(&item(app, "toggleWorkspacePanel", "Toggle Workspace Panel", accels)?)
+        .item(&item(app, "toggleWorkspacePanel", "Toggle Workspace Panel", ctx)?)
         .separator()
-        .item(&item(app, "openCommandPalette", "Show Command Palette", accels)?)
-        .item(&item(app, "showQuickSwitch", "Quick Switch", accels)?)
-        .item(&item(app, "jumpToBranch", "Jump to Branch…", accels)?)
-        .item(&item(app, "cycleAttentionTabs", "Cycle Attention Tabs", accels)?)
+        .item(&item(app, "openCommandPalette", "Show Command Palette", ctx)?)
+        .item(&item(app, "showQuickSwitch", "Quick Switch", ctx)?)
+        .item(&item(app, "jumpToBranch", "Jump to Branch…", ctx)?)
+        .item(&item(app, "cycleAttentionTabs", "Cycle Attention Tabs", ctx)?)
         .separator()
         .item(&PredefinedMenuItem::fullscreen(app, None)?)
         .build()?;
 
     let tab_submenu = SubmenuBuilder::new(app, "Tab")
-        .item(&item(app, "nextTab", "Next Tab", accels)?)
-        .item(&item(app, "prevTab", "Previous Tab", accels)?)
+        .item(&item(app, "nextTab", "Next Tab", ctx)?)
+        .item(&item(app, "prevTab", "Previous Tab", ctx)?)
         .build()?;
 
     let pane_submenu = SubmenuBuilder::new(app, "Pane")
-        .item(&item(app, "splitVertical", "Split Right", accels)?)
-        .item(&item(app, "splitHorizontal", "Split Down", accels)?)
+        .item(&item(app, "splitVertical", "Split Right", ctx)?)
+        .item(&item(app, "splitHorizontal", "Split Down", ctx)?)
         .separator()
-        .item(&item(app, "focusNextPane", "Focus Next Pane", accels)?)
-        .item(&item(app, "focusPrevPane", "Focus Previous Pane", accels)?)
+        .item(&item(app, "focusNextPane", "Focus Next Pane", ctx)?)
+        .item(&item(app, "focusPrevPane", "Focus Previous Pane", ctx)?)
         .build()?;
 
     let project_submenu = SubmenuBuilder::new(app, "Project")
-        .item(&item(app, "newProject", "New Project", accels)?)
-        .item(&item(app, "nextProject", "Next Project", accels)?)
-        .item(&item(app, "prevProject", "Previous Project", accels)?)
+        .item(&item(app, "newProject", "New Project", ctx)?)
+        .item(&item(app, "nextProject", "Next Project", ctx)?)
+        .item(&item(app, "prevProject", "Previous Project", ctx)?)
         .build()?;
 
     let window_submenu = SubmenuBuilder::new(app, "Window")
@@ -134,9 +159,9 @@ fn build_menu<R: Runtime>(
         .build()?;
 
     let help_submenu = SubmenuBuilder::new(app, "Help")
-        .item(&item(app, "openDocs", "Clawterm Documentation", accels)?)
-        .item(&item(app, "reportIssue", "Report an Issue", accels)?)
-        .item(&item(app, "showShortcuts", "Show Keyboard Shortcuts", accels)?)
+        .item(&item(app, "openDocs", "Clawterm Documentation", ctx)?)
+        .item(&item(app, "reportIssue", "Report an Issue", ctx)?)
+        .item(&item(app, "showShortcuts", "Show Keyboard Shortcuts", ctx)?)
         .build()?;
 
     MenuBuilder::new(app)
@@ -154,23 +179,37 @@ fn build_menu<R: Runtime>(
         .build()
 }
 
-/// Build a custom menu item, attaching an accelerator from `accels` if one
-/// is present and parses cleanly. If Tauri rejects the accelerator string,
-/// fall back to the no-accelerator item — the keybinding handler keeps
-/// firing on the raw key event regardless.
+/// Build a custom menu item, attaching an accelerator and enabled state
+/// from `ctx`. If Tauri rejects the accelerator string (compound chord
+/// the menu can't represent), fall back to a no-accelerator item — the
+/// keybinding handler keeps firing on the raw key event regardless.
 fn item<R: Runtime>(
     app: &AppHandle<R>,
     id: &str,
     label: &str,
-    accels: &HashMap<String, String>,
+    ctx: &MenuContext,
 ) -> tauri::Result<MenuItem<R>> {
-    let accel = accels.get(id).map(String::as_str).filter(|s| !s.is_empty());
+    let accel = ctx.accelerators.get(id).map(String::as_str).filter(|s| !s.is_empty());
+    let enabled = !ctx.disabled.contains(id);
     if let Some(a) = accel {
-        if let Ok(item) = MenuItemBuilder::with_id(id, label).accelerator(a).build(app) {
+        if let Ok(item) = MenuItemBuilder::with_id(id, label).accelerator(a).enabled(enabled).build(app) {
             return Ok(item);
         }
     }
-    MenuItemBuilder::with_id(id, label).build(app)
+    MenuItemBuilder::with_id(id, label).enabled(enabled).build(app)
+}
+
+/// Edit menu items use a fixed accelerator and never appear in
+/// config.keybindings; they still respect the enabled state.
+fn edit_item<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    label: &str,
+    accel: &str,
+    ctx: &MenuContext,
+) -> tauri::Result<MenuItem<R>> {
+    let enabled = !ctx.disabled.contains(id);
+    MenuItemBuilder::with_id(id, label).accelerator(accel).enabled(enabled).build(app)
 }
 
 /// Forward custom menu item clicks to the frontend. Predefined items
