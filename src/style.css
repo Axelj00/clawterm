@@ -933,6 +933,103 @@ body {
   white-space: nowrap;
 }
 
+.shortcuts-kbd-editable {
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition-speed), color var(--transition-speed);
+}
+
+.shortcuts-kbd-editable:hover,
+.shortcuts-kbd-editable:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.shortcuts-kbd-capturing {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.shortcuts-kbd-unbound {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.shortcuts-row-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.shortcuts-trash {
+  background: transparent;
+  border: var(--border-width) solid transparent;
+  color: var(--text-tertiary);
+  font-size: var(--font-md);
+  line-height: 1;
+  padding: 0 var(--space-2);
+  height: 22px;
+  min-width: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-speed), color var(--transition-speed),
+    border-color var(--transition-speed);
+}
+
+.shortcuts-trash:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.shortcuts-search {
+  width: 100%;
+  background: var(--bg-surface);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--font-sm);
+  margin-bottom: var(--space-5);
+  outline: none;
+}
+
+.shortcuts-search:focus {
+  border-color: var(--accent);
+}
+
+.shortcuts-conflict {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--warn, var(--text-primary));
+}
+
+.shortcuts-conflict button {
+  background: var(--bg-surface);
+  border: var(--border-width) solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.shortcuts-conflict button:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.shortcuts-row {
+  flex-wrap: wrap;
+}
+
 /* Sidebar resize divider — invisible, drag handle on the edge */
 #sidebar-divider {
   width: 0;

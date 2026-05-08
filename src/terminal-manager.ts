@@ -75,7 +75,7 @@ export class TerminalManager {
   private unlistenFocus: (() => void) | null = null;
   private lastTabSnapshot = "";
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
-  private shortcutsPanelEl: HTMLDivElement | null = null;
+  private shortcutsPanel: { element: HTMLDivElement; destroy(): void } | null = null;
   private creatingTab = false;
   private quitting = false;
   private handleKey!: (e: KeyboardEvent) => boolean;
@@ -953,9 +953,10 @@ export class TerminalManager {
     document.querySelectorAll(".close-confirm-overlay").forEach((el) => el.remove());
 
     // Dismiss shortcuts panel if open
-    if (this.shortcutsPanelEl) {
-      this.shortcutsPanelEl.remove();
-      this.shortcutsPanelEl = null;
+    if (this.shortcutsPanel) {
+      this.shortcutsPanel.destroy();
+      this.shortcutsPanel.element.remove();
+      this.shortcutsPanel = null;
       document.getElementById("shortcuts-btn")?.classList.remove("active");
     }
 
@@ -1050,10 +1051,10 @@ export class TerminalManager {
   private toggleSettingsPanel() {
     const container = document.getElementById("terminal-container")!;
 
-    // If panel is showing, remove it and restore the active tab
-    if (this.shortcutsPanelEl) {
-      this.shortcutsPanelEl.remove();
-      this.shortcutsPanelEl = null;
+    if (this.shortcutsPanel) {
+      this.shortcutsPanel.destroy();
+      this.shortcutsPanel.element.remove();
+      this.shortcutsPanel = null;
       if (this.activeTabId) {
         const tab = this.tabs.get(this.activeTabId);
         tab?.show();
@@ -1061,14 +1062,20 @@ export class TerminalManager {
       return;
     }
 
-    // Hide the active tab and show the settings panel
     if (this.activeTabId) {
       const tab = this.tabs.get(this.activeTabId);
       tab?.hide();
     }
 
-    this.shortcutsPanelEl = createSettingsPanel(this.config, () => this.openConfigFile());
-    container.appendChild(this.shortcutsPanelEl);
+    this.shortcutsPanel = createSettingsPanel({
+      config: this.config,
+      onOpenConfig: () => this.openConfigFile(),
+      onUpdate: (actionKey, binding) => {
+        (this.config.keybindings as Record<string, string>)[actionKey] = binding;
+        this.persistConfig();
+      },
+    });
+    container.appendChild(this.shortcutsPanel.element);
   }
 
   private openCommandPalette() {

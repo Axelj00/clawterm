@@ -442,8 +442,28 @@ const SHIFTED_KEYS: Record<string, string> = {
   "`": "~",
 };
 
+const MODIFIER_ONLY_KEYS = new Set(["Meta", "Control", "Shift", "Alt", "AltGraph"]);
+
+/**
+ * Build a binding string in our canonical format from a keydown event.
+ * Returns null if the user only pressed modifiers (waiting for the chord).
+ *
+ * The key part is `e.key.toLowerCase()` — same vocabulary `matchesKeybinding`
+ * compares against — so a string produced here round-trips through the matcher.
+ */
+export function eventToBinding(e: KeyboardEvent): string | null {
+  if (MODIFIER_ONLY_KEYS.has(e.key)) return null;
+  const parts: string[] = [];
+  if (e.metaKey) parts.push("cmd");
+  if (e.ctrlKey) parts.push("ctrl");
+  if (e.shiftKey) parts.push("shift");
+  if (e.altKey) parts.push("alt");
+  parts.push(e.key.toLowerCase());
+  return parts.join("+");
+}
+
 export function matchesKeybinding(e: KeyboardEvent, binding: string): boolean {
-  if (!binding) return false; // unbound (#484)
+  if (!binding) return false;
   const parts = binding.toLowerCase().split("+");
   const wantCmd = parts.includes("cmd");
   const wantCtrl = parts.includes("ctrl");

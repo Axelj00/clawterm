@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { DEFAULT_CONFIG, isUnbound, matchesKeybinding, validateConfig } from "../src/config";
+import {
+  DEFAULT_CONFIG,
+  eventToBinding,
+  isUnbound,
+  matchesKeybinding,
+  validateConfig,
+} from "../src/config";
 
 describe("validateConfig", () => {
   // Get a valid base config to modify
@@ -194,6 +200,36 @@ describe("validateConfig", () => {
       validateConfig(config as any, corrections);
       spy.mockRestore();
       expect(corrections).toContain("keybindings.newTab");
+    });
+
+    it("eventToBinding round-trips through matchesKeybinding", () => {
+      const make = (init: Partial<KeyboardEventInit> & { key: string }) =>
+        ({
+          key: init.key,
+          metaKey: init.metaKey ?? false,
+          ctrlKey: init.ctrlKey ?? false,
+          shiftKey: init.shiftKey ?? false,
+          altKey: init.altKey ?? false,
+        }) as unknown as KeyboardEvent;
+
+      const cases = [
+        make({ key: "t", metaKey: true }),
+        make({ key: "T", metaKey: true, shiftKey: true }),
+        make({ key: "ArrowUp", metaKey: true }),
+        make({ key: "/", ctrlKey: true, altKey: true }),
+      ];
+      for (const e of cases) {
+        const binding = eventToBinding(e);
+        expect(binding).not.toBeNull();
+        expect(matchesKeybinding(e, binding!)).toBe(true);
+      }
+    });
+
+    it("eventToBinding returns null when only modifiers are pressed", () => {
+      for (const key of ["Meta", "Control", "Shift", "Alt"]) {
+        const e = { key, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false } as unknown as KeyboardEvent;
+        expect(eventToBinding(e)).toBeNull();
+      }
     });
 
     it("matchesKeybinding short-circuits on empty binding", () => {
