@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { OutputAnalyzer } from "../src/output-analyzer";
+import type { OutputMatcher } from "../src/matchers";
 
 function toBytes(s: string): Uint8Array {
   return new TextEncoder().encode(s);
@@ -61,5 +62,40 @@ describe("OutputAnalyzer", () => {
     analyzer.feed(toBytes("FATAL: post-dispose\n"));
     analyzer.flush();
     expect(events.length).toBe(0);
+  });
+});
+
+describe("OutputAnalyzer per-instance decoder (#489)", () => {
+  // Match any single non-ASCII codepoint and surface it as `detail`.
+  const captureNonAscii: OutputMatcher = {
+    id: "capture-non-ascii",
+    pattern: /[^\x00-\x7f]/u,
+    type: "error",
+    cooldownMs: 0,
+  };
+
+  function captureFor(analyzer: OutputAnalyzer): string[] {
+    const out: string[] = [];
+    analyzer.onEvent((e) => out.push(e.detail));
+    return out;
+  }
+
+  it("does not interleave partial UTF-8 between instances", () => {
+    const a = new OutputAnalyzer([captureNonAscii]);
+    const b = new OutputAnalyzer([captureNonAscii]);
+    const aDetails = captureFor(a);
+    const bDetails = captureFor(b);
+
+    // 🔥 = F0 9F 94 A5, 🚀 = F0 9F 9A 80 — split each across feeds and
+    // interleave so a shared decoder would scramble both.
+    a.feed(new Uint8Array([0xf0, 0x9f]));
+    b.feed(new Uint8Array([0xf0, 0x9f]));
+    a.feed(new Uint8Array([0x94, 0xa5]));
+    b.feed(new Uint8Array([0x9a, 0x80]));
+    a.flush();
+    b.flush();
+
+    expect(aDetails).toEqual(["🔥"]);
+    expect(bDetails).toEqual(["🚀"]);
   });
 });

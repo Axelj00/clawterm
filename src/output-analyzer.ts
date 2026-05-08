@@ -38,9 +38,6 @@ class RingBuffer<T> implements Iterable<T> {
 // prettier-ignore
 const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-B]|\x1b[\x20-\x2f][\x40-\x7e]|\x08/g; // eslint-disable-line no-control-regex
 
-/** Reuse a single TextDecoder to avoid per-chunk allocation */
-const decoder = new TextDecoder();
-
 /** Debounce interval for regex matching when the pane is visible (ms) */
 const MATCH_DEBOUNCE_VISIBLE_MS = 100;
 /** Debounce interval for regex matching when the pane is hidden (ms).
@@ -63,6 +60,11 @@ export class OutputAnalyzer {
   private lastFired: Map<string, number> = new Map();
   private overlapWindow = "";
   private listener: ((event: OutputEvent) => void) | null = null;
+  /** Per-instance decoder — `stream: true` is stateful (buffers trailing
+   *  bytes that look like the start of a multi-byte codepoint). Sharing one
+   *  across panes interleaves their leftover bytes and corrupts matcher
+   *  input on PTY chunk boundaries. (#489) */
+  private readonly decoder = new TextDecoder();
 
   /** Pending text accumulated between debounced match runs */
   private pendingText = "";
@@ -87,7 +89,7 @@ export class OutputAnalyzer {
   }
 
   feed(data: Uint8Array) {
-    const text = decoder.decode(data, { stream: true });
+    const text = this.decoder.decode(data, { stream: true });
     this.pendingText += text;
     // Bound peak resident pendingText: hidden-pane debounce is 1s, so a
     // streaming agent can pile MB of text before runMatchers slices to 8KB.
