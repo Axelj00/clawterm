@@ -182,10 +182,12 @@ function deepMerge(
 
 const CURSOR_STYLES = ["bar", "block", "underline"];
 
-export function validateConfig(config: Config): Config {
+export function validateConfig(config: Config, corrections?: string[]): Config {
   const result = { ...config };
-  const warn = (field: string, msg: string) =>
+  const warn = (field: string, msg: string) => {
     logger.warn(`Config: invalid ${field} — ${msg}. Using default.`);
+    corrections?.push(field);
+  };
 
   // Shell
   if (typeof result.shell !== "string" || result.shell.length === 0) {
@@ -285,6 +287,7 @@ export function validateConfig(config: Config): Config {
   // Clamp maxPanes — WebGL is now lazy (only active tab uses GPU contexts)
   // so we can allow more panes.  Still cap to prevent extreme resource usage.
   if (typeof result.maxPanes !== "number" || result.maxPanes < 1 || result.maxPanes > 16) {
+    warn("maxPanes", "must be 1–16");
     result.maxPanes = DEFAULT_CONFIG.maxPanes;
   }
 
@@ -371,7 +374,8 @@ export async function loadConfig(): Promise<Config> {
       userConfig,
     ) as unknown as Config;
 
-    const validated = validateConfig(merged);
+    const corrections: string[] = [];
+    const validated = validateConfig(merged, corrections);
 
     // Check shell path exists and is executable on disk
     try {
@@ -383,6 +387,14 @@ export async function loadConfig(): Promise<Config> {
       }
     } catch (e) {
       logger.warn("Shell validation failed:", e);
+    }
+
+    if (corrections.length > 0) {
+      const summary =
+        corrections.length === 1
+          ? `Config: invalid value for "${corrections[0]}" — reverted to default`
+          : `Config: ${corrections.length} invalid values reverted to defaults (${corrections.slice(0, 3).join(", ")}${corrections.length > 3 ? ", …" : ""})`;
+      showToast(summary, "warn", 6000);
     }
 
     return validated;

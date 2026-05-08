@@ -135,4 +135,16 @@ describe("validateConfig", () => {
     // (#415). The empty string is the resolver's signal for auto mode.
     expect(DEFAULT_CONFIG.worktree.directory).toBe("");
   });
+
+  it("collects field names of corrections when sink provided", () => {
+    const config = baseConfig() as any;
+    config.font.size = 200;
+    (config.cursor as any).style = "blink-blink";
+    const corrections: string[] = [];
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    validateConfig(config as any, corrections);
+    spy.mockRestore();
+    expect(corrections).toContain("font.size");
+    expect(corrections).toContain("cursor.style");
+  });
 });
