@@ -14,7 +14,11 @@
  * behavior, so we strictly improve over the JS-index-as-cell-index path.
  */
 export function cellWidth(cp: number): 0 | 1 | 2 {
-  if (cp < 0x20 || (cp >= 0x7f && cp < 0xa0)) return 0;
+  // Hot-path: most terminal output is printable ASCII, and the
+  // file-link provider walks every codepoint of every visible line.
+  // Short-circuit before the range ladders.
+  if (cp >= 0x20 && cp < 0x7f) return 1;
+  if (cp < 0x20 || cp < 0xa0) return 0;
   if (isZeroWidth(cp)) return 0;
   if (isWide(cp)) return 2;
   return 1;
@@ -35,16 +39,7 @@ export function jsIndexToCellColumn(text: string, jsIndex: number): number {
 }
 
 /** Total cell width of a string. */
-export function stringCellWidth(text: string): number {
-  let col = 0;
-  let i = 0;
-  while (i < text.length) {
-    const cp = text.codePointAt(i)!;
-    col += cellWidth(cp);
-    i += cp > 0xffff ? 2 : 1;
-  }
-  return col;
-}
+export const stringCellWidth = (text: string): number => jsIndexToCellColumn(text, text.length);
 
 function isZeroWidth(cp: number): boolean {
   return (
@@ -63,7 +58,7 @@ function isZeroWidth(cp: number): boolean {
     (cp >= 0x06e7 && cp <= 0x06e8) ||
     (cp >= 0x06ea && cp <= 0x06ed) ||
     cp === 0x070f || // SAMARITAN MARK
-    (cp >= 0x0711 && cp <= 0x0711) ||
+    cp === 0x0711 ||
     (cp >= 0x0730 && cp <= 0x074a) ||
     (cp >= 0x1ab0 && cp <= 0x1aff) ||
     (cp >= 0x1dc0 && cp <= 0x1dff) ||
@@ -88,7 +83,6 @@ function isWide(cp: number): boolean {
     (cp >= 0x3400 && cp <= 0x4dbf) || // CJK Extension A
     (cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs
     (cp >= 0xa000 && cp <= 0xa4cf) || // Yi Syllables
-    (cp >= 0xa490 && cp <= 0xa4cf) ||
     (cp >= 0xac00 && cp <= 0xd7a3) || // Hangul Syllables
     (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
     (cp >= 0xfe10 && cp <= 0xfe19) ||
@@ -99,13 +93,8 @@ function isWide(cp: number): boolean {
     (cp >= 0x17000 && cp <= 0x18fff) || // Tangut
     (cp >= 0x1b000 && cp <= 0x1b16f) ||
     (cp >= 0x1f200 && cp <= 0x1f64f) || // Enclosed CJK + Misc Symbols + Emoticons
-    (cp >= 0x1f680 && cp <= 0x1f6ff) || // Transport & Map Symbols
-    (cp >= 0x1f700 && cp <= 0x1f77f) ||
-    (cp >= 0x1f780 && cp <= 0x1f7ff) ||
-    (cp >= 0x1f800 && cp <= 0x1f8ff) ||
-    (cp >= 0x1f900 && cp <= 0x1f9ff) || // Supplemental Symbols and Pictographs
-    (cp >= 0x1fa00 && cp <= 0x1fa6f) ||
-    (cp >= 0x1fa70 && cp <= 0x1faff) || // Symbols and Pictographs Extended-A
+    (cp >= 0x1f680 && cp <= 0x1f9ff) || // Transport, Symbols, Geometric, Supplemental Pictographs
+    (cp >= 0x1fa00 && cp <= 0x1faff) || // Symbols and Pictographs Extended-A
     (cp >= 0x20000 && cp <= 0x2fffd) || // CJK Extension B–F
     (cp >= 0x30000 && cp <= 0x3fffd) // CJK Extension G
   );

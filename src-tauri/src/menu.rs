@@ -53,8 +53,8 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
 
     let file_submenu = SubmenuBuilder::new(app, "File")
-        .item(&MenuItemBuilder::with_id("newTab", "New Tab").build(app)?)
-        .item(&MenuItemBuilder::with_id("newWorktreeTab", "New Agent Tab on Branch…").build(app)?)
+        .item(&MenuItemBuilder::with_id("createTab", "New Tab").build(app)?)
+        .item(&MenuItemBuilder::with_id("openWorktreeDialog", "New Agent Tab on Branch…").build(app)?)
         .item(&MenuItemBuilder::with_id("newProject", "New Project").build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("restoreClosedTab", "Restore Closed Tab").build(app)?)

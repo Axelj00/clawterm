@@ -80,6 +80,7 @@ export class TerminalManager {
   private quitting = false;
   private handleKey!: (e: KeyboardEvent) => boolean;
   private menuActions!: KeybindingActions;
+  private unlistenMenu: (() => void) | null = null;
   private closedTabStack: { cwd: string; title?: string }[] = [];
   private workspacePanel!: WorkspacePanel;
   /** Debounced config write — coalesces rapid changes (zoom, sidebar drag) */
@@ -1054,89 +1055,25 @@ export class TerminalManager {
 
   /** Listen for macOS menu bar events emitted from menu.rs (#487).
    *  Dispatches into the same KeybindingActions surface as the keybinding
-   *  handler and command palette so all three input paths stay in sync. */
+   *  handler and command palette so all three input paths stay in sync.
+   *  Menu item IDs that match a KeybindingActions method name are
+   *  forwarded to it directly; the rest go through dispatchMenuExtra. */
   private async setupNativeMenu() {
-    const { listen } = await import("@tauri-apps/api/event");
-    listen<string>("menu-action", (e) => this.dispatchMenuAction(e.payload)).catch((err) =>
-      logger.debug("menu-action listen failed:", err),
-    );
+    try {
+      const { listen } = await import("@tauri-apps/api/event");
+      this.unlistenMenu = await listen<string>("menu-action", (e) => this.dispatchMenuAction(e.payload));
+    } catch (err) {
+      logger.debug("menu-action listen failed:", err);
+    }
   }
 
   private dispatchMenuAction(id: string): void {
-    const a = this.menuActions;
+    const fn = (this.menuActions as unknown as Record<string, ((arg?: unknown) => void) | undefined>)[id];
+    if (typeof fn === "function") {
+      fn();
+      return;
+    }
     switch (id) {
-      case "newTab":
-        a.createTab();
-        return;
-      case "closeActiveTab":
-        a.closeActiveTab();
-        return;
-      case "nextTab":
-        a.nextTab();
-        return;
-      case "prevTab":
-        a.prevTab();
-        return;
-      case "restoreClosedTab":
-        a.restoreClosedTab();
-        return;
-      case "cycleAttentionTabs":
-        a.cycleAttentionTabs();
-        return;
-      case "toggleSearch":
-        a.toggleSearch();
-        return;
-      case "showQuickSwitch":
-        a.showQuickSwitch();
-        return;
-      case "openCommandPalette":
-        a.openCommandPalette();
-        return;
-      case "splitHorizontal":
-        a.splitHorizontal();
-        return;
-      case "splitVertical":
-        a.splitVertical();
-        return;
-      case "closeActivePane":
-        a.closeActivePane();
-        return;
-      case "focusNextPane":
-        a.focusNextPane();
-        return;
-      case "focusPrevPane":
-        a.focusPrevPane();
-        return;
-      case "zoomIn":
-        a.zoomIn();
-        return;
-      case "zoomOut":
-        a.zoomOut();
-        return;
-      case "zoomReset":
-        a.zoomReset();
-        return;
-      case "newWorktreeTab":
-        a.openWorktreeDialog();
-        return;
-      case "toggleWorkspacePanel":
-        a.toggleWorkspacePanel();
-        return;
-      case "jumpToBranch":
-        a.jumpToBranch();
-        return;
-      case "newProject":
-        a.newProject();
-        return;
-      case "nextProject":
-        a.nextProject();
-        return;
-      case "prevProject":
-        a.prevProject();
-        return;
-      case "reloadConfig":
-        a.reloadConfig();
-        return;
       case "toggleSettings":
       case "showShortcuts":
         this.toggleSettingsPanel();
@@ -2323,6 +2260,8 @@ export class TerminalManager {
     }
     this.unlistenFocus?.();
     this.unlistenFocus = null;
+    this.unlistenMenu?.();
+    this.unlistenMenu = null;
     this.serverTracker.dispose();
     this.notifications.dispose();
     this.tabSwitcher.dispose();
