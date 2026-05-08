@@ -126,17 +126,7 @@ export class Tab {
       this.updateFocusedClass(pane);
     };
 
-    // Instant CWD detection: shell sets terminal title on every prompt.
-    // Trigger an immediate poll when the title changes (debounced).
-    let titlePollTimer: ReturnType<typeof setTimeout> | null = null;
-
     pane.onExit = (exitCode: number) => {
-      // Clear any pending title-poll timer so it doesn't fire after the pane
-      // is gone (prevents leaked closures referencing a disposed pane).
-      if (titlePollTimer) {
-        clearTimeout(titlePollTimer);
-        titlePollTimer = null;
-      }
       if (exitCode !== 0) {
         this.state.lastError = `Exit code ${exitCode}`;
         this.updateTitle();
@@ -154,18 +144,11 @@ export class Tab {
     };
 
     pane.onTerminalTitle = () => {
-      // Terminal title change = user activity — resume full polling
+      // Title change = activity. Resume full polling — the next central tick
+      // (≤ pollIntervalMs away) will pick up the new CWD/git state. Spawning
+      // an extra debounced poll here added a per-prompt-redraw IPC for shells
+      // with dynamic prompt themes (oh-my-zsh, starship). (#461)
       pane.idleConsecutive = 0;
-
-      if (titlePollTimer) clearTimeout(titlePollTimer);
-      titlePollTimer = setTimeout(() => {
-        this.pollPane(pane)
-          .then(() => {
-            this.deriveTabState();
-            this.updateTitle();
-          })
-          .catch((e) => logger.debug("[pollPane] output event poll failed:", e));
-      }, 100); // 100ms debounce
     };
 
     // OSC 9;2 notification — agent explicitly requesting attention
