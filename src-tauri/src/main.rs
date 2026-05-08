@@ -99,14 +99,14 @@ fn setup_claude_statusline() -> Result<(), String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let script_path = dir.join("statusline.sh");
 
-    // Write the status line script — receives JSON on stdin, writes to a temp file keyed by PPID
-    let script = r#"#!/bin/sh
-input=$(cat)
-dir="/tmp/clawterm-status"
-mkdir -p "$dir"
-echo "$input" > "$dir/$PPID.json"
-"#;
-    write_private(&script_path, script)?;
+    // Write the status line script — receives JSON on stdin, writes a
+    // file keyed by the parent PID (Claude Code). Reader path lives at
+    // process_info::CLAUDE_STATUS_DIR; both must agree.
+    let script = format!(
+        "#!/bin/sh\ninput=$(cat)\ndir=\"{dir}\"\nmkdir -p \"$dir\"\necho \"$input\" > \"$dir/$PPID.json\"\n",
+        dir = process_info::CLAUDE_STATUS_DIR,
+    );
+    write_private(&script_path, &script)?;
 
     // Make executable
     #[cfg(unix)]

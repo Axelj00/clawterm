@@ -936,7 +936,9 @@ body {
 .shortcuts-kbd-editable {
   cursor: pointer;
   outline: none;
-  transition: border-color var(--transition-speed), color var(--transition-speed);
+  transition:
+    border-color var(--transition-speed),
+    color var(--transition-speed);
 }
 
 .shortcuts-kbd-editable:hover,
@@ -973,7 +975,9 @@ body {
   min-width: 22px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background var(--transition-speed), color var(--transition-speed),
+  transition:
+    background var(--transition-speed),
+    color var(--transition-speed),
     border-color var(--transition-speed);
 }
 
@@ -1232,6 +1236,130 @@ body {
 
 .footer-branch {
   color: var(--text-tertiary);
+}
+
+/* Claude Code statusLine row in pane footer */
+.footer-claude-context {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.footer-claude-context-bar {
+  position: relative;
+  display: inline-block;
+  width: 56px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.footer-claude-context-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: var(--text-tertiary);
+  border-radius: 3px;
+}
+
+.footer-claude-context-bar-ok .footer-claude-context-fill {
+  background: #30a46c;
+}
+.footer-claude-context-bar-warn .footer-claude-context-fill {
+  background: #f5a623;
+}
+.footer-claude-context-bar-crit .footer-claude-context-fill {
+  background: #e5484d;
+}
+
+.footer-claude-context-label {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.footer-claude-tag {
+  font-size: 10px;
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.footer-claude-model {
+  color: var(--text-secondary);
+}
+
+.footer-claude-effort {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+.footer-claude-effort-high {
+  background: rgba(95, 135, 255, 0.18);
+  color: #a8c0ff;
+}
+.footer-claude-effort-xhigh,
+.footer-claude-effort-max {
+  background: rgba(229, 72, 77, 0.18);
+  color: #ff8a8e;
+}
+
+.footer-claude-thinking {
+  color: #bf7af0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.footer-claude-cost {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
+.footer-claude-vim {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+/* Tab attention dot for Claude signals */
+.tab-claude-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin: 0 var(--space-2);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.tab-claude-dot-context-near-limit {
+  background: #f5a623;
+  box-shadow: 0 0 4px rgba(245, 166, 35, 0.6);
+}
+.tab-claude-dot-rate-limit-near {
+  background: #e5484d;
+  box-shadow: 0 0 4px rgba(229, 72, 77, 0.6);
+}
+.tab-claude-dot-compaction-imminent {
+  background: #bf7af0;
+  box-shadow: 0 0 6px rgba(191, 122, 240, 0.7);
+  animation: claude-pulse 2s ease-in-out infinite;
+}
+
+@keyframes claude-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Event timeline gutter — thin strip on the right edge of each pane */

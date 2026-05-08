@@ -8,6 +8,9 @@ import {
   type GitStatusInfo,
   createDefaultTabState,
   computeFolderTitle,
+  parseStatusLine,
+  deriveClaudeAttention,
+  type StatusLineData,
 } from "./tab-state";
 import type { OutputEvent } from "./matchers";
 import type { SessionSplitNode, SessionSplitLeaf } from "./session";
@@ -23,6 +26,7 @@ interface PanePollResult {
   cwd_full: string;
   git: GitStatusInfo | null;
   project_name: string | null;
+  claude_status: string | null;
 }
 
 export type SplitDirection = "horizontal" | "vertical";
@@ -775,16 +779,19 @@ export class Tab {
 
       const skipExpensive = newIsIdle && pane.idleConsecutive > 5;
 
-      // Single batched IPC call for CWD + git + project
+      // Single batched IPC call for CWD + git + project + Claude status
       const result = await invokeWithTimeout<PanePollResult>(
         "poll_pane_info",
         {
           shellPid,
+          fgPid: fgPgid !== shellPid ? fgPgid : null,
           lastCwd: pane.lastFullCwd || null,
           skipExpensive,
         },
         timeout,
       );
+
+      ps.statusLine = result.claude_status ? parseStatusLine(result.claude_status) : null;
 
       const fullCwd = result.cwd_full || null;
       ps.folderName = result.cwd_folder || ps.folderName;
@@ -864,6 +871,10 @@ export class Tab {
     this.state.lastError = fps.lastError;
     this.state.gitBranch = fps.gitBranch;
     this.state.gitStatus = fps.gitStatus;
+
+    const statusLines: StatusLineData[] = [];
+    for (const p of this.panes) if (p.state.statusLine) statusLines.push(p.state.statusLine);
+    this.state.claudeAttention = deriveClaudeAttention(statusLines);
 
     logger.debug(`[deriveTabState] tab=${this.id} folder=${this.state.folderName}`);
   }

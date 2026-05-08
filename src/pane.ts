@@ -12,7 +12,7 @@ import { ScrollAnchor } from "./scroll-anchor";
 import type { OutputEvent, OutputMatcher } from "./matchers";
 import { DEFAULT_MATCHERS } from "./matchers";
 import { registerOscHandlers, type OscNotificationEvent } from "./osc-handler";
-import { type PaneState, createDefaultPaneState, formatElapsed } from "./tab-state";
+import { type PaneState, type StatusLineData, createDefaultPaneState, formatElapsed } from "./tab-state";
 import { SearchBar } from "./search-bar";
 import { logger } from "./logger";
 import { showToast } from "./toast";
@@ -29,6 +29,63 @@ interface IPtyWithInit extends IPty {
 }
 
 let paneCounter = 0;
+
+/** Cost threshold below which we hide the cost label so empty sessions stay clean. */
+const COST_DISPLAY_MIN_USD = 0.1;
+
+function pushSpan(parent: HTMLElement, cls: string, text: string, title?: string): HTMLSpanElement {
+  const el = document.createElement("span");
+  el.className = cls;
+  el.textContent = text;
+  if (title) el.title = title;
+  parent.appendChild(el);
+  return el;
+}
+
+/**
+ * Build the Claude statusLine row in the pane footer. Shows context bar,
+ * model, effort badge, thinking dot, cost, and vim mode when relevant.
+ * Mutates `row` in place.
+ */
+function renderClaudeRow(row: HTMLElement, sl: StatusLineData): void {
+  const used = sl.contextWindow?.usedPercentage ?? null;
+
+  if (used !== null) {
+    const wrap = pushSpan(row, "footer-claude-context", "");
+    const level = used >= 85 ? "crit" : used >= 60 ? "warn" : "ok";
+    const bar = pushSpan(wrap, `footer-claude-context-bar footer-claude-context-bar-${level}`, "");
+    const fill = pushSpan(bar, "footer-claude-context-fill", "");
+    fill.style.width = `${Math.min(100, Math.max(0, used)).toFixed(0)}%`;
+    pushSpan(wrap, "footer-claude-context-label", `${used.toFixed(0)}%`);
+    if (sl.exceeds200kTokens) {
+      pushSpan(wrap, "footer-claude-tag", ">200k", "Exceeds 200k tokens — auto-compaction soon");
+    }
+  }
+
+  pushSpan(row, "footer-claude-model", sl.model.displayName);
+
+  const effort = sl.effort?.level;
+  if (effort && effort !== "low" && effort !== "medium") {
+    pushSpan(row, `footer-claude-effort footer-claude-effort-${effort}`, effort, `Effort: ${effort}`);
+  }
+
+  if (sl.thinking?.enabled) {
+    const dot = pushSpan(row, "footer-claude-thinking", "•", "Thinking enabled");
+    dot.setAttribute("aria-label", "Thinking enabled");
+  }
+
+  if (sl.cost && sl.cost.totalCostUsd >= COST_DISPLAY_MIN_USD) {
+    const tooltip = `Cost: $${sl.cost.totalCostUsd.toFixed(4)} · ${sl.cost.totalLinesAdded}+ / ${sl.cost.totalLinesRemoved}-`;
+    pushSpan(row, "footer-claude-cost", `$${sl.cost.totalCostUsd.toFixed(2)}`, tooltip);
+  }
+
+  if (sl.vim && sl.vim.mode !== "NORMAL") {
+    const cls = `footer-claude-vim footer-claude-vim-${sl.vim.mode.toLowerCase().replace(" ", "-")}`;
+    pushSpan(row, cls, sl.vim.mode);
+  }
+
+  row.style.display = "";
+}
 
 /**
  * A single terminal pane — owns a Terminal + PTY + output analysis.
@@ -684,13 +741,19 @@ export class Pane {
     }
   }
 
-  /** Update per-pane status footer with current state (#348).
+  /** Update per-pane status footer with current state.
    *  Called after each poll cycle. Uses a cache key to skip redundant DOM updates. */
   updateFooter() {
     if (!this.footer || !this.footerRow1 || !this.footerRow2) return;
     const s = this.state;
     const gs = s.gitStatus;
-    const key = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}`;
+    const sl = s.statusLine;
+    const ctx = sl?.contextWindow;
+    const cost = sl?.cost;
+    const slKey = sl
+      ? `${sl.model.displayName}|${ctx?.usedPercentage ?? ""}|${sl.exceeds200kTokens ?? ""}|${sl.effort?.level ?? ""}|${sl.thinking?.enabled ?? ""}|${cost?.totalCostUsd ?? ""}|${cost?.totalLinesAdded ?? ""}|${cost?.totalLinesRemoved ?? ""}|${sl.vim?.mode ?? ""}`
+      : "no-sl";
+    const key = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${slKey}`;
     if (key === this.footerCacheKey) return;
     this.footerCacheKey = key;
 
@@ -699,12 +762,10 @@ export class Pane {
     this.footerRow2.style.display = "none";
     this.footer.className = "pane-footer";
 
-    // Spacer
     const spacer = document.createElement("span");
     spacer.className = "footer-spacer";
     this.footerRow1.appendChild(spacer);
 
-    // Branch + unpushed
     if (s.gitBranch) {
       const branchSpan = document.createElement("span");
       branchSpan.className = "footer-branch";
@@ -714,11 +775,12 @@ export class Pane {
       this.footerRow1.appendChild(branchSpan);
     }
 
-    // Uptime
     const elapsedSpan = document.createElement("span");
     elapsedSpan.className = "footer-elapsed";
     elapsedSpan.textContent = formatElapsed(this.createdAt);
     this.footerRow1.appendChild(elapsedSpan);
+
+    if (sl) renderClaudeRow(this.footerRow2, sl);
   }
 
   private deferredFitTimer: ReturnType<typeof setTimeout> | null = null;

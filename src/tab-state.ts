@@ -11,11 +11,210 @@ export interface GitStatusInfo {
   is_worktree: boolean;
 }
 
-/** Claude Code statusLine protocol data — piped via OSC or sideband (#348) */
+/**
+ * Claude Code statusLine protocol data, parsed from the JSON the
+ * `statusline.sh` writer dumps after every assistant turn. Fields
+ * the writer doesn't include are left undefined; we never fabricate.
+ */
 export interface StatusLineData {
-  contextUsedPercent: number;
-  costUsd: number;
-  modelName: string;
+  sessionId: string;
+  model: { id: string; displayName: string };
+  cost?: {
+    totalCostUsd: number;
+    totalDurationMs: number;
+    totalApiDurationMs: number;
+    totalLinesAdded: number;
+    totalLinesRemoved: number;
+  };
+  contextWindow?: {
+    inputTokens: number;
+    outputTokens: number;
+    contextWindowSize: number;
+    /** null before first API call */
+    usedPercentage: number | null;
+    remainingPercentage: number | null;
+  };
+  exceeds200kTokens?: boolean;
+  effort?: { level: "low" | "medium" | "high" | "xhigh" | "max" };
+  thinking?: { enabled: boolean };
+  rateLimits?: {
+    fiveHour?: { usedPercentage: number; resetsAt: number };
+    sevenDay?: { usedPercentage: number; resetsAt: number };
+  };
+  vim?: { mode: "NORMAL" | "INSERT" | "VISUAL" | "VISUAL LINE" };
+  agent?: { name: string };
+  worktree?: { name: string; branch?: string };
+  outputStyle?: { name: string };
+}
+
+// Type guards used by parseStatusLine.
+const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
+const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
+const obj = (parent: Record<string, unknown>, k: string): Record<string, unknown> | undefined => {
+  const v = parent[k];
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
+};
+
+/**
+ * Parse Claude Code's statusLine JSON into our shape. Returns null if
+ * the payload is malformed or missing required fields. Tolerant of
+ * missing optional fields — the writer omits sections that don't apply.
+ *
+ * Claude Code emits snake_case (per the documented schema) so we don't
+ * accept camelCase variants — wider tolerance would be dead code.
+ */
+export function parseStatusLine(json: string): StatusLineData | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+
+  const sessionId = str(r.session_id);
+  const modelObj = obj(r, "model");
+  const modelId = str(modelObj?.id);
+  const modelDisplay = str(modelObj?.display_name);
+  if (!sessionId || !modelId || !modelDisplay) return null;
+
+  const out: StatusLineData = {
+    sessionId,
+    model: { id: modelId, displayName: modelDisplay },
+  };
+
+  const costObj = obj(r, "cost");
+  if (costObj) {
+    const totalCostUsd = num(costObj.total_cost_usd);
+    const totalDurationMs = num(costObj.total_duration_ms);
+    const totalApiDurationMs = num(costObj.total_api_duration_ms);
+    const totalLinesAdded = num(costObj.total_lines_added);
+    const totalLinesRemoved = num(costObj.total_lines_removed);
+    if (
+      totalCostUsd !== undefined &&
+      totalDurationMs !== undefined &&
+      totalApiDurationMs !== undefined &&
+      totalLinesAdded !== undefined &&
+      totalLinesRemoved !== undefined
+    ) {
+      out.cost = {
+        totalCostUsd,
+        totalDurationMs,
+        totalApiDurationMs,
+        totalLinesAdded,
+        totalLinesRemoved,
+      };
+    }
+  }
+
+  const ctx = obj(r, "context_window");
+  if (ctx) {
+    const inputTokens = num(ctx.input_tokens);
+    const outputTokens = num(ctx.output_tokens);
+    const contextWindowSize = num(ctx.context_window_size);
+    if (inputTokens !== undefined && outputTokens !== undefined && contextWindowSize !== undefined) {
+      out.contextWindow = {
+        inputTokens,
+        outputTokens,
+        contextWindowSize,
+        usedPercentage: num(ctx.used_percentage) ?? null,
+        remainingPercentage: num(ctx.remaining_percentage) ?? null,
+      };
+    }
+  }
+
+  const exceeds = bool(r.exceeds_200k_tokens);
+  if (exceeds !== undefined) out.exceeds200kTokens = exceeds;
+
+  const effortLevel = str(obj(r, "effort")?.level);
+  if (
+    effortLevel === "low" ||
+    effortLevel === "medium" ||
+    effortLevel === "high" ||
+    effortLevel === "xhigh" ||
+    effortLevel === "max"
+  ) {
+    out.effort = { level: effortLevel };
+  }
+
+  const thinkingEnabled = bool(obj(r, "thinking")?.enabled);
+  if (thinkingEnabled !== undefined) out.thinking = { enabled: thinkingEnabled };
+
+  const rl = obj(r, "rate_limits");
+  if (rl) {
+    const window = (key: string) => {
+      const w = obj(rl, key);
+      if (!w) return undefined;
+      const used = num(w.used_percentage);
+      const resets = num(w.resets_at);
+      return used !== undefined && resets !== undefined
+        ? { usedPercentage: used, resetsAt: resets }
+        : undefined;
+    };
+    const five = window("five_hour");
+    const seven = window("seven_day");
+    if (five || seven) {
+      out.rateLimits = {};
+      if (five) out.rateLimits.fiveHour = five;
+      if (seven) out.rateLimits.sevenDay = seven;
+    }
+  }
+
+  const vimMode = str(obj(r, "vim")?.mode);
+  if (vimMode === "NORMAL" || vimMode === "INSERT" || vimMode === "VISUAL" || vimMode === "VISUAL LINE") {
+    out.vim = { mode: vimMode };
+  }
+
+  const agentName = str(obj(r, "agent")?.name);
+  if (agentName) out.agent = { name: agentName };
+
+  const wtObj = obj(r, "worktree");
+  const wtName = str(wtObj?.name);
+  if (wtName) {
+    out.worktree = { name: wtName };
+    const wtBranch = str(wtObj?.branch);
+    if (wtBranch) out.worktree.branch = wtBranch;
+  }
+
+  const styleName = str(obj(r, "output_style")?.name);
+  if (styleName) out.outputStyle = { name: styleName };
+
+  return out;
+}
+
+export type ClaudeAttention = "context-near-limit" | "rate-limit-near" | "compaction-imminent" | null;
+
+const ATTENTION_RANK: Record<NonNullable<ClaudeAttention>, number> = {
+  "compaction-imminent": 3,
+  "rate-limit-near": 2,
+  "context-near-limit": 1,
+};
+const rankAttention = (a: ClaudeAttention): number => (a ? ATTENTION_RANK[a] : 0);
+
+/**
+ * Aggregate Claude attention signal across panes. Returns the most
+ * urgent signal (compaction-imminent > rate-limit-near > context-near-limit).
+ */
+export function deriveClaudeAttention(panes: readonly StatusLineData[]): ClaudeAttention {
+  let best: ClaudeAttention = null;
+
+  for (const sl of panes) {
+    let signal: ClaudeAttention = null;
+    const used = sl.contextWindow?.usedPercentage;
+
+    if (sl.exceeds200kTokens && used != null && used >= 95) {
+      signal = "compaction-imminent";
+    } else {
+      const five = sl.rateLimits?.fiveHour?.usedPercentage ?? 0;
+      const seven = sl.rateLimits?.sevenDay?.usedPercentage ?? 0;
+      if (five >= 90 || seven >= 90) signal = "rate-limit-near";
+      else if (used != null && used >= 85) signal = "context-near-limit";
+    }
+    if (rankAttention(signal) > rankAttention(best)) best = signal;
+  }
+  return best;
 }
 
 /** Per-pane state — tracks each pane independently */
@@ -62,6 +261,8 @@ export interface TabState {
   gitStatus: GitStatusInfo | null;
   /** Notification type for background badges — persists until tab is focused */
   notification: NotificationType;
+  /** Aggregated Claude Code attention signal across panes. */
+  claudeAttention: ClaudeAttention;
 }
 
 export function createDefaultTabState(): TabState {
@@ -76,6 +277,7 @@ export function createDefaultTabState(): TabState {
     gitBranch: null,
     gitStatus: null,
     notification: null,
+    claudeAttention: null,
   };
 }
 

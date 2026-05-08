@@ -8,7 +8,14 @@ interface ChildRefs {
   hint: HTMLElement;
   detail: HTMLElement;
   paneList: HTMLElement;
+  claudeDot: HTMLElement;
 }
+
+const CLAUDE_DOT_LABEL: Record<string, string> = {
+  "context-near-limit": "Context near limit",
+  "rate-limit-near": "Rate limit approaching",
+  "compaction-imminent": "Auto-compaction imminent",
+};
 
 export interface TabRenderActions {
   closeTab(id: string): void;
@@ -114,6 +121,17 @@ export class TabRenderer {
     refs.hint.textContent = "";
     refs.hint.style.display = "none";
 
+    const attention = tab.state.claudeAttention;
+    if (attention) {
+      refs.claudeDot.style.display = "";
+      refs.claudeDot.className = `tab-claude-dot tab-claude-dot-${attention}`;
+      refs.claudeDot.title = CLAUDE_DOT_LABEL[attention] ?? "";
+      refs.claudeDot.setAttribute("aria-label", refs.claudeDot.title);
+    } else {
+      refs.claudeDot.style.display = "none";
+      refs.claudeDot.removeAttribute("aria-label");
+    }
+
     // Ensure correct order in DOM
     const refChild = domIndex < list.children.length ? list.children[domIndex] : null;
     if (entry !== refChild) {
@@ -145,7 +163,12 @@ export class TabRenderer {
       this.actions.closeTab(id);
     });
 
+    const claudeDot = document.createElement("span");
+    claudeDot.className = "tab-claude-dot";
+    claudeDot.style.display = "none";
+
     header.appendChild(title);
+    header.appendChild(claudeDot);
     header.appendChild(hint);
     header.appendChild(close);
 
@@ -211,7 +234,7 @@ export class TabRenderer {
     });
 
     this.tabElements.set(id, entry);
-    this.tabChildRefs.set(id, { header, title, hint, detail, paneList });
+    this.tabChildRefs.set(id, { header, title, hint, detail, paneList, claudeDot });
     list.appendChild(entry);
 
     return entry;
@@ -279,7 +302,7 @@ export class TabRenderer {
       const focusedIdx = tab.getPanes().indexOf(tab.getFocusedPane());
       const paneSnap = panes.length > 1 ? `${focusedIdx}:${panes.map((p) => paneRowLabel(p)).join(",")}` : "";
       parts.push(
-        `${id}|${tab.title}|${s.needsAttention}|${s.serverPort}|${s.lastError}|${s.gitBranch}|${gitSnap}|${s.folderName}|${s.notification}|${tab.pinned}|${tab.muted}|${paneSnap}`,
+        `${id}|${tab.title}|${s.needsAttention}|${s.serverPort}|${s.lastError}|${s.gitBranch}|${gitSnap}|${s.folderName}|${s.notification}|${tab.pinned}|${tab.muted}|${paneSnap}|${s.claudeAttention ?? ""}`,
       );
     }
     parts.push(`active:${activeTabId}`);
