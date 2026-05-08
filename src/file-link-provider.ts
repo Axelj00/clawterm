@@ -1,6 +1,7 @@
 import type { Terminal, ILinkProvider, ILink, IBufferRange } from "@xterm/xterm";
 import { showToast } from "./toast";
 import { setBounded } from "./utils";
+import { jsIndexToCellColumn, stringCellWidth } from "./cell-width";
 
 /**
  * Custom xterm.js link provider that detects file paths in terminal output.
@@ -52,10 +53,13 @@ export class FileLinkProvider implements ILinkProvider {
         continue;
       }
 
-      const startX = match.index + 1; // 1-based
+      // Convert JS code-unit index to terminal cell column. Wide CJK chars
+      // and most emoji occupy 2 cells; surrogate pairs take 2 code units
+      // for 1 cell; combining marks take 0 cells. (#491)
+      const startX = jsIndexToCellColumn(line, match.index) + 1; // 1-based
       const range: IBufferRange = {
         start: { x: startX, y: bufferLineNumber },
-        end: { x: startX + text.length, y: bufferLineNumber },
+        end: { x: startX + stringCellWidth(text), y: bufferLineNumber },
       };
 
       links.push({
