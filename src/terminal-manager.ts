@@ -13,6 +13,7 @@ import {
 import { computeFolderTitle, createDefaultTabState } from "./tab-state";
 import { NotificationManager } from "./notifications";
 import { ServerTracker } from "./server-tracker";
+import { IdleTracker } from "./idle-tracker";
 import { showContextMenu, type ContextMenuItem } from "./context-menu";
 import { TabSwitcher, type SwitcherTab } from "./tab-switcher";
 import type { OutputEvent } from "./matchers";
@@ -67,13 +68,10 @@ export class TerminalManager {
    *  the same frame are batched into a single renderTabList() + updateStatusBar(). */
   private renderRaf = 0;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Number of consecutive poll cycles where every pane was idle. Once this
-   *  exceeds IDLE_STREAK_THRESHOLD the loop drops to IDLE_INTERVAL_MS;
-   *  any activity signal (PTY data, tab switch, focus regain) calls wake()
-   *  which resets the streak and resumes the fast cadence. (#456) */
-  private idleStreak = 0;
-  private static readonly IDLE_STREAK_THRESHOLD = 10;
-  private static readonly IDLE_INTERVAL_MS = 10_000;
+  /** Idle-mode bookkeeping for the central poll loop. Wake-up sources call
+   *  this.idleTracker.wake(); the tick reports its anyActive scan via
+   *  noteTick() and reads intervalFor() to pick the next delay. (#456, #480) */
+  private readonly idleTracker = new IdleTracker();
   private unlistenFocus: (() => void) | null = null;
   private lastTabSnapshot = "";
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2065,7 +2063,8 @@ export class TerminalManager {
 
   private startCentralPoll() {
     this.pollCycleCount = 0;
-    this.idleStreak = 0;
+    this.idleTracker.reset();
+    this.idleTracker.setWakeHandler(() => this.scheduleNextPoll(0));
     this.scheduleNextPoll(this.config.advanced.pollIntervalMs);
   }
 
@@ -2081,11 +2080,9 @@ export class TerminalManager {
    *  (PTY data, OSC notification, terminal title change, tab switch, window
    *  focus regain) so the user doesn't wait the full IDLE_INTERVAL_MS to see
    *  state catch up after a quiet period. Cheap when not idle — early-returns
-   *  before touching the timer. (#456) */
+   *  inside IdleTracker before touching the timer. (#456, #480) */
   wake(): void {
-    if (this.idleStreak === 0) return;
-    this.idleStreak = 0;
-    this.scheduleNextPoll(0);
+    this.idleTracker.wake();
   }
 
   private async pollTick() {
@@ -2115,7 +2112,7 @@ export class TerminalManager {
     logger.debug(
       `[centralPoll] cycle=${this.pollCycleCount} tabs=${this.tabs.size} ` +
         `slot=${slot}/${slots} bgSlice=${sliceStart}..${sliceEnd}/${bgIds.length} ` +
-        `active=${activeId} idleStreak=${this.idleStreak}`,
+        `active=${activeId} idleStreak=${this.idleTracker.streakCount}`,
     );
 
     // Poll tabs concurrently so one stuck IPC can't block the rest.
@@ -2154,12 +2151,10 @@ export class TerminalManager {
       }
       if (anyActive) break;
     }
-    if (anyActive) this.idleStreak = 0;
-    else this.idleStreak++;
+    this.idleTracker.noteTick(anyActive);
 
     if (this.quitting) return;
-    const inIdleMode = this.idleStreak >= TerminalManager.IDLE_STREAK_THRESHOLD;
-    this.scheduleNextPoll(inIdleMode ? TerminalManager.IDLE_INTERVAL_MS : fgInterval);
+    this.scheduleNextPoll(this.idleTracker.intervalFor(fgInterval));
   }
 
   private computeTabSnapshot(): string {
