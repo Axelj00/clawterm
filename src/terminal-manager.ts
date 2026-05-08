@@ -2090,18 +2090,20 @@ export class TerminalManager {
           `slot=${slot}/${slots} bgSlice=${sliceStart}..${sliceEnd}/${bgIds.length} active=${activeId}`,
       );
 
-      // Poll tabs concurrently so one stuck IPC call can't block everything
+      // Poll tabs concurrently so one stuck IPC call can't block everything.
+      // Active-tab pollProcessInfo runs with high priority so its IPC slots
+      // jump ahead of bg-slice work in the pollSemaphore queue. (#459)
       const polls: Promise<void>[] = [];
       if (activeId) {
         const activeTab = this.tabs.get(activeId);
         if (activeTab) {
-          polls.push(activeTab.pollProcessInfo().catch((e) => logger.debug("[poll] tab error:", e)));
+          polls.push(activeTab.pollProcessInfo("high").catch((e) => logger.debug("[poll] tab error:", e)));
         }
       }
       for (let i = sliceStart; i < sliceEnd; i++) {
         const tab = this.tabs.get(bgIds[i]);
         if (tab) {
-          polls.push(tab.pollProcessInfo().catch((e) => logger.debug("[poll] tab error:", e)));
+          polls.push(tab.pollProcessInfo("low").catch((e) => logger.debug("[poll] tab error:", e)));
         }
       }
       await Promise.all(polls);

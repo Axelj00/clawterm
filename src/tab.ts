@@ -1,6 +1,7 @@
 import type { Config } from "./config";
 import { invoke } from "@tauri-apps/api/core";
 import { invokeWithTimeout } from "./utils";
+import { pollSemaphore } from "./poll-throttle";
 import {
   type TabState,
   type PaneState,
@@ -712,8 +713,10 @@ export class Tab {
     return this.panes;
   }
 
-  /** Poll process info for ALL panes. Called by TerminalManager. */
-  async pollProcessInfo() {
+  /** Poll process info for ALL panes. Called by TerminalManager.
+   *  Active-tab callers pass priority="high" so their IPC slots jump
+   *  ahead of any background-slice work. (#459) */
+  async pollProcessInfo(priority: "high" | "low" = "low") {
     if (this.pollStopped) {
       // Resume polling if: (a) any pane produced output since we stopped, OR
       // (b) enough time has passed (30s) to retry in case the process is idle
@@ -731,11 +734,15 @@ export class Tab {
       }
     }
 
-    // Poll all panes concurrently
+    // Poll all panes concurrently — but throttle through pollSemaphore so we
+    // don't slam the Tauri command pool when N panes × M tabs all dispatch
+    // poll_pane_info on the same cycle. (#459)
     const pollable = this.panes.filter((p) => !p.getProcessInfo().disposed && p.getProcessInfo().pid);
     logger.debug(`[pollProcessInfo] tab=${this.id} panes=${this.panes.length} pollable=${pollable.length}`);
     const polls = pollable.map((pane) =>
-      this.pollPane(pane).catch((e) => logger.debug("[pollPane] error:", e)),
+      pollSemaphore
+        .withSlot(priority, () => this.pollPane(pane))
+        .catch((e) => logger.debug("[pollPane] error:", e)),
     );
 
     await Promise.all(polls);
