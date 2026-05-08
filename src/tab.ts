@@ -575,6 +575,9 @@ export class Tab {
   private setupDividerDrag(divider: HTMLElement, branch: SplitBranch) {
     let dragging = false;
     let rafId = 0;
+    /** Leaf panes under the dragged branch — only these change size during
+     *  drag, so per-frame fit() can skip the rest of the tab's panes. (#464) */
+    const affectedPanes: Pane[] = [];
 
     // Double-click to auto-balance (50/50)
     divider.addEventListener("dblclick", (e) => {
@@ -587,6 +590,8 @@ export class Tab {
     const startDrag = (e: Event) => {
       e.preventDefault();
       dragging = true;
+      affectedPanes.length = 0;
+      this.collectPanes(branch, affectedPanes);
       document.body.style.cursor = branch.direction === "horizontal" ? "col-resize" : "row-resize";
       document.body.classList.add("no-select");
       // Disable pointer events on all panes during drag so the xterm canvas
@@ -630,7 +635,9 @@ export class Tab {
       if (!rafId) {
         rafId = requestAnimationFrame(() => {
           rafId = 0;
-          this.forceFitAllPanes();
+          // Only refit panes whose size actually changed — the rest of the
+          // tab's panes are unaffected by this divider drag. (#464)
+          for (const pane of affectedPanes) pane.forceFit();
         });
       }
     };
@@ -676,12 +683,23 @@ export class Tab {
   }
 
   /** Force-fit all panes immediately, bypassing the output-activity deferral.
-   *  Used during divider drag and other user-initiated resizes where immediate
+   *  Used at end-of-drag and other user-initiated resizes where immediate
    *  visual feedback is more important than avoiding write/fit races. */
   private forceFitAllPanes() {
     for (const pane of this.panes) {
       pane.forceFit();
     }
+  }
+
+  /** Walk a split subtree and append every leaf pane to `out`. (#464) */
+  private collectPanes(node: SplitNode, out: Pane[]): Pane[] {
+    if (node.type === "leaf") {
+      out.push(node.pane);
+    } else {
+      this.collectPanes(node.children[0], out);
+      this.collectPanes(node.children[1], out);
+    }
+    return out;
   }
 
   /** Get per-pane states for rendering in the sidebar */
