@@ -9,6 +9,7 @@ export class SearchBar {
   private onClose: (() => void) | null = null;
   private resultsDisposable: { dispose(): void } | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private listenerAbort = new AbortController();
 
   constructor(container: HTMLElement, searchAddon: SearchAddon, onClose?: () => void) {
     this.onClose = onClose ?? null;
@@ -28,22 +29,24 @@ export class SearchBar {
     this.countLabel.className = "search-count";
     this.countLabel.setAttribute("aria-live", "polite");
 
+    const signal = this.listenerAbort.signal;
+
     const prevBtn = document.createElement("button");
     prevBtn.className = "search-btn";
     prevBtn.textContent = "\u25B2";
     prevBtn.title = "Previous (Shift+Enter)";
-    prevBtn.addEventListener("click", () => this.findPrev());
+    prevBtn.addEventListener("click", () => this.findPrev(), { signal });
 
     const nextBtn = document.createElement("button");
     nextBtn.className = "search-btn";
     nextBtn.textContent = "\u25BC";
     nextBtn.title = "Next (Enter)";
-    nextBtn.addEventListener("click", () => this.findNext());
+    nextBtn.addEventListener("click", () => this.findNext(), { signal });
 
     const closeBtn = document.createElement("button");
     closeBtn.className = "search-btn search-close";
     closeBtn.textContent = "\u00D7";
-    closeBtn.addEventListener("click", () => this.hide());
+    closeBtn.addEventListener("click", () => this.hide(), { signal });
 
     this.element.appendChild(this.input);
     this.element.appendChild(this.countLabel);
@@ -52,7 +55,6 @@ export class SearchBar {
     this.element.appendChild(closeBtn);
     container.appendChild(this.element);
 
-    // Listen for search result changes
     this.resultsDisposable = this.searchAddon.onDidChangeResults((e) => {
       if (e.resultCount === 0) {
         this.countLabel.textContent = this.input.value ? "No results" : "";
@@ -63,34 +65,41 @@ export class SearchBar {
       }
     });
 
-    this.input.addEventListener("input", () => {
-      if (this.searchTimer) clearTimeout(this.searchTimer);
-      const term = this.input.value;
-      if (!term) {
-        this.searchAddon.clearDecorations();
-        this.countLabel.textContent = "";
-        return;
-      }
-      // Debounce search to avoid scanning the full scrollback on every keystroke
-      this.searchTimer = setTimeout(() => {
-        this.searchTimer = null;
-        this.searchAddon.findNext(term, { incremental: true });
-      }, 150);
-    });
-
-    this.input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          this.findPrev();
-        } else {
-          this.findNext();
+    this.input.addEventListener(
+      "input",
+      () => {
+        if (this.searchTimer) clearTimeout(this.searchTimer);
+        const term = this.input.value;
+        if (!term) {
+          this.searchAddon.clearDecorations();
+          this.countLabel.textContent = "";
+          return;
         }
-      }
-      if (e.key === "Escape") {
-        this.hide();
-      }
-    });
+        this.searchTimer = setTimeout(() => {
+          this.searchTimer = null;
+          this.searchAddon.findNext(term, { incremental: true });
+        }, 150);
+      },
+      { signal },
+    );
+
+    this.input.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (e.shiftKey) {
+            this.findPrev();
+          } else {
+            this.findNext();
+          }
+        }
+        if (e.key === "Escape") {
+          this.hide();
+        }
+      },
+      { signal },
+    );
   }
 
   toggle() {
@@ -137,6 +146,7 @@ export class SearchBar {
       clearTimeout(this.searchTimer);
       this.searchTimer = null;
     }
+    this.listenerAbort.abort();
     this.resultsDisposable?.dispose();
     this.element.remove();
     // Break references for GC after disposal — the object must not be used after this.
