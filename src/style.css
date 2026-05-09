@@ -9,11 +9,10 @@
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-active: rgba(255, 255, 255, 0.1);
 
-  /* Text — 4 semantic levels */
+  /* Text — 3 semantic levels */
   --text-primary: rgba(240, 240, 244, 0.9);
   --text-secondary: rgba(240, 240, 244, 0.55);
   --text-tertiary: rgba(240, 240, 244, 0.35);
-  --text-disabled: rgba(240, 240, 244, 0.2);
 
   /* Accent — neutral light for a clean dark UI */
   --accent: rgba(240, 240, 244, 0.8);
@@ -65,7 +64,6 @@
   --sidebar-width: 200px;
   --titlebar-height: 38px;
   --pane-padding: 0;
-  --pane-unfocused-opacity: 0.75;
   --split-divider-width: var(--space-3);
 
   /* Spacing scale — strict 4pt grid (#493). 6 and 10 dropped; off-grid
@@ -89,7 +87,6 @@
   --icon-dot-sm: 4px;
   --icon-dot: 8px;
   --icon-sm: 12px;
-  --icon-md: 14px;
   --icon-lg: 20px;
   --icon-btn: 18px; /* small inline icon button (tab close) */
   --icon-btn-lg: 32px; /* chrome icon button (settings, new-tab) */
@@ -797,7 +794,7 @@ body {
 
 #new-tab-btn {
   width: 100%;
-  height: 32px;
+  height: var(--icon-btn-lg);
   background: var(--bg-surface);
   border: var(--border-width) solid var(--border-subtle);
   color: var(--text-tertiary);

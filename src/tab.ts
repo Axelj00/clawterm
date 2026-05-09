@@ -565,8 +565,10 @@ export class Tab {
     const secondEl = second.type === "leaf" ? second.pane.element : second.element;
 
     const pct = branch.ratio * 100;
-    // Subtract divider width from available space — must match CSS --split-divider-width
-    const dividerPx = 6; // matches CSS --split-divider-width (--space-3)
+    // Subtract half the divider width from each side so the panes fit
+    // inside the container. Must match CSS --split-divider-width, which is
+    // var(--space-3) = 8px after the 4pt-grid normalization (#493).
+    const dividerPx = 8;
     const half = dividerPx / 2;
     // Use flex shorthand to override the CSS `flex: 1` on .pane / .split-container.
     // Setting width/height alone has no effect because flex-basis: 0% (from flex: 1)
