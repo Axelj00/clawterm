@@ -1130,6 +1130,9 @@ body {
   min-width: 0;
   min-height: 0;
   background: var(--bg-base);
+  /* Top is 0 — the titlebar / project bar already sits flush above
+     the terminal area, so an extra gap there reads as wasted chrome.
+     Sides + bottom keep the panes inset from the app's rounded border. */
   padding: 0 var(--space-3) var(--space-3) var(--space-3);
 }
 
@@ -1964,7 +1967,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4) var(--space-4) var(--space-3);
+  padding: var(--space-4);
   border-bottom: var(--border-width) solid var(--bg-hover);
 }
 .workspace-panel-title {
@@ -2006,8 +2009,10 @@ body {
   background: var(--border-subtle);
 }
 .workspace-entry.active {
-  background: var(--bg-hover);
-  border-left: 2px solid var(--accent);
+  /* Match the rest of the app's "selected list item" convention
+     (.project-tab.active, .palette-item.selected, .context-menu-item:hover):
+     bg-active tint, no left-border accent. (#498) */
+  background: var(--bg-active);
 }
 .workspace-entry-branch {
   display: flex;
@@ -2080,7 +2085,7 @@ body {
   max-height: 240px;
 }
 .worktree-group-header {
-  padding: var(--space-3) var(--space-5) var(--space-1);
+  padding: var(--space-3) var(--space-5);
   font-size: var(--font-xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
@@ -2132,7 +2137,7 @@ body {
   border-color: var(--accent);
 }
 .worktree-buttons {
-  padding: var(--space-3) var(--space-5) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
