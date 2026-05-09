@@ -476,8 +476,7 @@ export class Pane {
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Failed to start shell: ${this.config.shell}`, "error", 8000);
       logger.warn("PTY spawn failed:", e);
-      this.terminal.writeln(`\r\n\x1b[31m  Failed to start shell: ${this.config.shell}\x1b[0m`);
-      this.terminal.writeln(`\x1b[31m  ${msg}\x1b[0m\r\n`);
+      this.showPaneError(`Failed to start shell: ${this.config.shell}`, msg);
       return false;
     }
 
@@ -976,6 +975,23 @@ export class Pane {
 
   selectAll(): void {
     this.terminal.selectAll();
+  }
+
+  /** Replace the terminal viewport with a designed error overlay (#500).
+   *  Used when the PTY can't spawn — previously this was inline red
+   *  ANSI text written into a half-initialized terminal. */
+  private showPaneError(title: string, body: string): void {
+    const overlay = document.createElement("div");
+    overlay.className = "pane-error";
+    const titleEl = document.createElement("div");
+    titleEl.className = "pane-error-title";
+    titleEl.textContent = title;
+    const bodyEl = document.createElement("div");
+    bodyEl.className = "pane-error-body";
+    bodyEl.textContent = body;
+    overlay.appendChild(titleEl);
+    overlay.appendChild(bodyEl);
+    this.element.appendChild(overlay);
   }
 
   /** Shared scroll state update — called from both terminal.onScroll (buffer

@@ -236,6 +236,43 @@ textarea {
   color: var(--text-primary);
 }
 
+/* ── Empty / error states (#500) ──────────────────────────────────────
+   Linear-style pure-type empty / error surfaces used by lists and panes
+   when there's nothing to show or something failed. */
+.empty-state {
+  padding: var(--space-6);
+  text-align: center;
+  font-size: var(--font-base);
+  color: var(--text-tertiary);
+}
+
+.pane-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  text-align: center;
+}
+.pane-error-title {
+  font-size: var(--font-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-red);
+}
+.pane-error-body {
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  color: var(--text-tertiary);
+  max-width: 480px;
+  overflow-wrap: anywhere;
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;
@@ -2092,13 +2129,6 @@ body {
   padding-left: var(--space-4);
   margin-top: var(--space-1);
 }
-.workspace-panel-empty {
-  padding: var(--space-6);
-  text-align: center;
-  font-size: var(--font-base);
-  color: var(--text-tertiary);
-}
-
 /* Worktree dialog */
 .worktree-modal {
   max-height: 460px;
@@ -2176,13 +2206,6 @@ body {
   border-radius: var(--radius-md);
   font-size: var(--font-md);
 }
-.worktree-empty {
-  padding: var(--space-5);
-  text-align: center;
-  font-size: var(--font-base);
-  color: var(--text-secondary);
-}
-
 /* Close confirmation dialog */
 .close-confirm-overlay {
   position: fixed;

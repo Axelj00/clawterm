@@ -204,7 +204,7 @@ export function showWorktreeDialog(
 
     if (filtered.length === 0 && !isNewBranch) {
       const empty = document.createElement("div");
-      empty.className = "worktree-empty";
+      empty.className = "empty-state";
       empty.textContent = "No matching branches. Type a name to create one.";
       list.appendChild(empty);
     }

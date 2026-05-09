@@ -101,7 +101,7 @@ export class WorkspacePanel {
 
     if (entries.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "workspace-panel-empty";
+      empty.className = "empty-state";
       empty.textContent = "No tabs open";
       this.listEl.appendChild(empty);
       return;
