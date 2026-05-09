@@ -4,6 +4,7 @@ import {
   createDefaultPaneState,
   computeDisplayTitle,
   computeFolderTitle,
+  formatElapsed,
   parseStatusLine,
   deriveClaudeAttention,
   type TabState,
@@ -287,5 +288,26 @@ describe("deriveClaudeAttention", () => {
       contextWindow: { inputTokens: 1, outputTokens: 1, contextWindowSize: 200000, usedPercentage: 96, remainingPercentage: 4 },
     });
     expect(deriveClaudeAttention([ctxNear, compact])).toBe("compaction-imminent");
+  });
+});
+
+describe("formatElapsed", () => {
+  const at = (offsetMs: number) => Date.now() - offsetMs;
+
+  it("uses M:SS for the first hour", () => {
+    expect(formatElapsed(at(0))).toBe("0:00");
+    expect(formatElapsed(at(45 * 1000))).toBe("0:45");
+    expect(formatElapsed(at(75 * 1000))).toBe("1:15");
+    expect(formatElapsed(at(59 * 60 * 1000))).toMatch(/^59:00$/);
+  });
+
+  it("uses H:MM:SS between 1 hour and 24 hours", () => {
+    expect(formatElapsed(at(60 * 60 * 1000))).toBe("1:00:00");
+    expect(formatElapsed(at(23 * 60 * 60 * 1000 + 30 * 60 * 1000))).toBe("23:30:00");
+  });
+
+  it("caps at Nd Hh past 24 hours so width stays bounded (#506)", () => {
+    expect(formatElapsed(at(24 * 60 * 60 * 1000))).toBe("1d 0h");
+    expect(formatElapsed(at(7 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000))).toBe("7d 14h");
   });
 });

@@ -300,14 +300,21 @@ export function computeDisplayTitle(state: TabState): string {
   return `${project} — ${state.processName}`;
 }
 
-/** Format elapsed time as compact M:SS or H:MM:SS (#335) */
+/** Format elapsed time as compact M:SS, H:MM:SS, or Nd Hh past 24 hours
+ *  (#335, #506). The day-bucketed form caps the string to ≤6 characters
+ *  so a multi-day pane doesn't push the truncatable footer items into
+ *  ellipsis just because nobody closed the tab. */
 export function formatElapsed(startMs: number): string {
   const secs = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
   const s = secs % 60;
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}:${s.toString().padStart(2, "0")}`;
   const hrs = Math.floor(mins / 60);
-  return `${hrs}:${(mins % 60).toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  if (hrs < 24) {
+    return `${hrs}:${(mins % 60).toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }
+  const days = Math.floor(hrs / 24);
+  return `${days}d ${hrs % 24}h`;
 }
 
 /** Deterministic branch color from a fixed warm palette */
