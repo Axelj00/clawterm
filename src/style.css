@@ -1231,12 +1231,18 @@ body {
 }
 
 /* Terminal wrapper — isolates xterm from the footer so FitAddon measures
-   the correct available height instead of the full .pane height (#397). */
+   the correct available height instead of the full .pane height (#397).
+   Pinned to --bg-surface (the xterm theme background) so the leftover
+   pixels between xterm's last whole-row and this element's bottom edge
+   match the cell color instead of leaking the focused pane's lighter
+   bg-elevated through. Without this, every tab switch could resize the
+   terminal by one row and reveal a 16px lighter "bar" above the footer. */
 .pane-terminal {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   position: relative;
+  background: var(--bg-surface);
 }
 
 .pane .xterm {
