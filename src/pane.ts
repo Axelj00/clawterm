@@ -746,8 +746,13 @@ export class Pane {
 
     pushSpan(this.footerRow1, "footer-spacer", "");
     if (s.gitBranch) {
-      const branchText = gs && gs.ahead > 0 ? `${s.gitBranch} \u2191${gs.ahead}` : s.gitBranch;
-      pushSpan(this.footerRow1, "footer-branch", branchText);
+      // Branch and ahead-counter are separate spans so the branch can
+      // ellipsis under pressure while the actionable "you have unpushed
+      // commits" indicator stays pinned next to it (#503).
+      pushSpan(this.footerRow1, "footer-branch", s.gitBranch);
+      if (gs && gs.ahead > 0) {
+        pushSpan(this.footerRow1, "footer-branch-ahead", `\u2191${gs.ahead}`, `${gs.ahead} ahead of remote`);
+      }
     }
     pushSpan(this.footerRow1, "footer-elapsed", elapsed);
   }
