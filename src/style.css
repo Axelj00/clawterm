@@ -156,6 +156,86 @@ textarea {
   outline-offset: -1px;
 }
 
+/* ── Button base + modifiers (#499) ───────────────────────────────────
+   Canonical button surface used by dialogs, the command palette, the
+   update notice, and the settings panel. Per-surface classes keep their
+   layout-specific tweaks (width, alignment) and additionally apply one
+   of the .btn--* modifiers below for color/border/hover behavior. */
+.btn {
+  font-family: inherit;
+  font-size: var(--font-sm);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--transition-speed),
+    color var(--transition-speed),
+    border-color var(--transition-speed),
+    opacity var(--transition-speed);
+}
+.btn:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-on, var(--bg-base));
+}
+.btn--primary:hover:not(:disabled) {
+  opacity: var(--opacity-strong);
+}
+
+.btn--secondary {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: var(--scrollbar-thumb);
+}
+
+/* Bordered surface variant — used for non-destructive panel buttons
+   (Settings → Open / Check for Updates) where modal-style filled gray
+   would feel too heavy. */
+.btn--ghost {
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.btn--destructive {
+  background: var(--color-red);
+  color: var(--text-primary);
+}
+.btn--destructive:hover:not(:disabled) {
+  opacity: var(--opacity-strong);
+}
+
+/* Square chrome icon button — used for the tab close button, project
+   tab close, settings cog, etc. Surface-specific dimensions live on
+   the per-feature class. */
+.btn--icon {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+.btn--icon:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;
@@ -893,51 +973,15 @@ body {
   color: var(--text-tertiary);
 }
 
+/* Layout-only — colors come from .btn / .btn--ghost (#499). */
 .settings-open-btn {
-  background: var(--bg-surface);
-  border: var(--border-width) solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-md);
-  cursor: pointer;
-  transition:
-    background var(--transition-speed),
-    color var(--transition-speed),
-    border-color var(--transition-speed);
-}
-
-.settings-open-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border-color: var(--border-default);
 }
 
 .settings-update-btn {
-  background: var(--bg-surface);
-  border: var(--border-width) solid var(--border-subtle);
-  color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: var(--font-sm);
-  font-weight: var(--font-weight-medium);
-  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
-  cursor: pointer;
-  transition:
-    background var(--transition-speed),
-    color var(--transition-speed),
-    border-color var(--transition-speed);
-}
-
-.settings-update-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border-color: var(--border-default);
-}
-
-.settings-update-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .shortcuts-group {
@@ -1748,26 +1792,10 @@ body {
   white-space: nowrap;
 }
 
+/* Layout-only — colors / hover come from .btn / .btn--primary (#499). */
 .update-notice-action {
-  background: var(--accent);
-  color: var(--accent-on, var(--bg-base));
-  border: none;
-  border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-3);
-  font-size: var(--font-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
   flex-shrink: 0;
-  transition: opacity var(--transition-speed);
-}
-
-.update-notice-action:hover {
-  opacity: var(--opacity-strong);
-}
-
-.update-notice-action:disabled {
-  opacity: var(--disabled-opacity);
-  cursor: default;
 }
 
 .update-notice.installing {
@@ -2142,33 +2170,11 @@ body {
   justify-content: flex-end;
   gap: var(--space-3);
 }
+/* Layout-only — colors come from .btn / .btn--* (#499). */
 .worktree-btn {
   padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-md);
-  border: none;
   font-size: var(--font-md);
-  cursor: pointer;
-  transition:
-    background var(--transition-speed),
-    color var(--transition-speed);
-}
-.worktree-btn-cancel {
-  background: var(--bg-active);
-  color: var(--text-primary);
-}
-.worktree-btn-cancel:hover {
-  background: var(--scrollbar-thumb);
-}
-.worktree-btn-create {
-  background: var(--text-primary);
-  color: var(--bg-base);
-}
-.worktree-btn-create:hover {
-  opacity: var(--opacity-strong);
-}
-.worktree-btn-create:disabled {
-  opacity: var(--disabled-opacity);
-  cursor: default;
 }
 .worktree-empty {
   padding: var(--space-5);
@@ -2258,33 +2264,11 @@ body {
   gap: var(--space-3);
 }
 
+/* Layout-only — colors come from .btn / .btn--* (#499). */
 .update-dialog-btn {
   padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-md);
   font-size: var(--font-md);
-  cursor: pointer;
-  border: none;
-  transition:
-    background var(--transition-speed),
-    opacity var(--transition-speed);
-}
-
-.update-dialog-btn.cancel {
-  background: var(--bg-active);
-  color: var(--text-primary);
-}
-
-.update-dialog-btn.cancel:hover {
-  background: var(--scrollbar-thumb);
-}
-
-.update-dialog-btn.confirm {
-  background: var(--accent);
-  color: var(--accent-on, var(--bg-base));
-}
-
-.update-dialog-btn.confirm:hover {
-  opacity: var(--opacity-strong);
 }
 
 /* Release notes — rendered markdown */
@@ -2368,43 +2352,11 @@ body {
   gap: var(--space-3);
 }
 
+/* Layout-only — colors come from .btn / .btn--* (#499). */
 .close-confirm-btn {
   padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-md);
   font-size: var(--font-md);
-  cursor: pointer;
-  border: none;
-  transition:
-    background var(--transition-speed),
-    color var(--transition-speed),
-    opacity var(--transition-speed);
-}
-
-.close-confirm-btn.cancel {
-  background: var(--bg-active);
-  color: var(--text-primary);
-}
-
-.close-confirm-btn.cancel:hover {
-  background: var(--scrollbar-thumb);
-}
-
-.close-confirm-btn.confirm {
-  background: var(--color-red);
-  color: var(--text-primary);
-}
-
-.close-confirm-btn.confirm:hover {
-  opacity: var(--opacity-strong);
-}
-
-.close-confirm-btn.primary {
-  background: var(--text-primary);
-  color: var(--bg-base);
-}
-
-.close-confirm-btn.primary:hover {
-  opacity: var(--opacity-strong);
 }
 
 /* Split choice dialog */

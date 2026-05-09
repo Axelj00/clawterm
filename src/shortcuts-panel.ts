@@ -176,7 +176,7 @@ export function createSettingsPanel(opts: PanelOptions): ShortcutsPanel {
   configRow.appendChild(configPath);
 
   const openBtn = document.createElement("button");
-  openBtn.className = "settings-open-btn";
+  openBtn.className = "btn btn--ghost settings-open-btn";
   openBtn.textContent = "Open";
   openBtn.addEventListener("click", opts.onOpenConfig, { signal: panelSignal });
   configRow.appendChild(openBtn);
@@ -197,7 +197,7 @@ export function createSettingsPanel(opts: PanelOptions): ShortcutsPanel {
   updatesRow.appendChild(versionLabel);
 
   const checkBtn = document.createElement("button");
-  checkBtn.className = "settings-update-btn";
+  checkBtn.className = "btn btn--ghost settings-update-btn";
   checkBtn.textContent = "Check for Updates";
   checkBtn.addEventListener(
     "click",

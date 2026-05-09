@@ -253,11 +253,11 @@ function showUpdateConfirm(version: string, releaseNotes: string, onConfirm: () 
   actionsEl.className = "update-dialog-actions";
 
   const cancelBtn = document.createElement("button");
-  cancelBtn.className = "update-dialog-btn cancel";
+  cancelBtn.className = "btn btn--secondary update-dialog-btn cancel";
   cancelBtn.textContent = "Cancel";
 
   const confirmBtn = document.createElement("button");
-  confirmBtn.className = "update-dialog-btn confirm";
+  confirmBtn.className = "btn btn--primary update-dialog-btn confirm";
   confirmBtn.textContent = "Update & Restart";
 
   actionsEl.appendChild(cancelBtn);
@@ -334,7 +334,7 @@ function showUpdateNotice(version: string, releaseNotes: string, onInstall: () =
   text.appendChild(ver);
 
   const btn = document.createElement("button");
-  btn.className = "update-notice-action";
+  btn.className = "btn btn--primary update-notice-action";
   btn.textContent = "Update";
 
   notice.appendChild(dot);
