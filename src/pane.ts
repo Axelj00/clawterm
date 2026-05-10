@@ -30,6 +30,11 @@ interface IPtyWithInit extends IPty {
 
 let paneCounter = 0;
 
+/** Foreground process names that are safe to paste multi-line text into
+ *  without the confirm dialog — they're interactive AI agent prompts,
+ *  not shells about to execute each line as a command (see #508). */
+const TRUSTED_AGENT_PROCESSES: ReadonlySet<string> = new Set(["claude"]);
+
 function pushSpan(parent: HTMLElement, cls: string, text: string, title?: string): HTMLSpanElement {
   const el = document.createElement("span");
   el.className = cls;
@@ -368,7 +373,7 @@ export class Pane {
         if (!text.includes("\n") || this.terminal.modes.bracketedPasteMode) return;
         e.preventDefault();
         e.stopPropagation();
-        this.showPasteConfirm(text);
+        void this.pasteWithAgentTrust(text);
       },
       { signal: this.ac.signal },
     );
@@ -947,13 +952,46 @@ export class Pane {
     });
   }
 
+  /** Paste multi-line text, but skip the confirm dialog when the foreground
+   *  process is a trusted AI agent CLI — pasting into Claude Code's prompt
+   *  isn't the same risk profile as pasting into a shell (#508). */
+  private async pasteWithAgentTrust(text: string): Promise<void> {
+    if (await this.foregroundIsTrustedAgent()) {
+      if (this.disposed) return;
+      this.terminal.paste(text);
+      return;
+    }
+    if (this.disposed) return;
+    this.showPasteConfirm(text);
+  }
+
+  /** Resolve the pane's foreground process name and check it against the
+   *  trusted-agent allowlist. Returns false on any failure so we fall back
+   *  to the safe (dialog) path. */
+  private async foregroundIsTrustedAgent(): Promise<boolean> {
+    const handle = this.ptyHandle;
+    const shellPid = this.ptyPid;
+    if (handle == null || shellPid == null) return false;
+    try {
+      const fgPid = await invoke<number>("plugin:pty|foreground_pid", { pid: handle });
+      // No foreground process — we're at the shell prompt, where the dialog
+      // is the right safety net (multi-line paste can execute commands).
+      if (fgPid === shellPid) return false;
+      const name = await invoke<string>("get_process_name", { pid: fgPid });
+      return TRUSTED_AGENT_PROCESSES.has(name);
+    } catch (e) {
+      logger.debug("foregroundIsTrustedAgent: lookup failed", e);
+      return false;
+    }
+  }
+
   /** Public paste entrypoint — applies the same multi-line gate as the
    *  keyboard paste handler, so the macOS Edit menu and right-click menu
    *  can't bypass the paste-confirm dialog. */
   requestPaste(text: string): void {
     if (!text || this.disposed) return;
     if (text.includes("\n") && !this.terminal.modes.bracketedPasteMode) {
-      this.showPasteConfirm(text);
+      void this.pasteWithAgentTrust(text);
     } else {
       this.terminal.paste(text);
     }
