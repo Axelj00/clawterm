@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-05-10
+
+### Fixed
+- **Cmd+C / Cmd+V / Cmd+X / Cmd+A no longer worked in the terminal** — the 1.3.0 macOS menu bar attached `CmdOrCtrl+C/V/X/A` accelerators to the Edit menu, which intercepted those keystrokes before xterm could see them and routed them through `dispatchEditAction`. That handler called `isTextInputFocused()` first, but xterm parks focus in a hidden `<textarea class="xterm-helper-textarea">` to capture key events, so the check returned true and copy/paste/select-all were dispatched against that empty helper textarea via `document.execCommand` instead of the terminal. Net effect: Cmd+V silently inserted into a hidden DOM node and Cmd+C read its empty selection — nothing reached the PTY or the clipboard. `isTextInputFocused()` now ignores xterm's helper textarea so the Edit menu falls through to the pane's paste/copy/select-all path (no issue, hotfix)
+
+
 ## [1.3.0] - 2026-05-09
 
 ### Added
@@ -1158,7 +1164,8 @@ This release establishes Clawterm's visual identity, transforming the app from a
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/clawterm/clawterm/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/clawterm/clawterm/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/clawterm/clawterm/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/clawterm/clawterm/compare/v1.1.1...v1.1.2
