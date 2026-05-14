@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 - **The `context-near-limit` attention dot is gone** — the new sidebar bar already paints the same threshold (≥85% → crit red), so the orange dot was redundant. The `rate-limit-near` and `compaction-imminent` dots stay; they encode signals the bar can't express on its own (#507)
+- **Brand assets now derive from a single source SVG** — `docs/brand/clawterm.svg` is the canonical mark; the app icon (`src-tauri/icons/*.png` + `.icns`), the favicon (`docs/favicon.svg` + `.png`), and the new GitHub social-preview image (`docs/brand/og-image.png`) all regenerate from it via documented `sips` / `iconutil` commands in `docs/brand/README.md`. Geometry preserved — the chevron mark is unchanged. Hand-edited bitmaps are now a bug; re-run the regeneration commands after any edit (#501)
 
 
 ## [1.4.0] - 2026-05-14
