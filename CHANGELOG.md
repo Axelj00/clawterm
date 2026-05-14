@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-05-14
+
 ### Added
 - **Sidebar tabs now show a Claude Code context-window bar + N% per tab** — previously you had to click into a tab to find out how much context a Claude session had used. The bar now lives on every tab header whose pane has a Claude statusLine, using the same ok / warn / crit color thresholds (60% / 85%) as the pane footer so the two surfaces never diverge. Multi-pane tabs show the max % across panes on the header AND a per-pane % column inside the sub-list, so you can also see *which* pane is burning context. Plain shells render no bar and reserve no space — the indicator is opt-in by the presence of Claude data. CSS extracted to a shared `.context-bar` / `.context-bar-fill` family so the sidebar and footer can't drift on width, color, or fill behaviour. Snapshot diffing buckets to nearest 5% so typing in Claude doesn't repaint sidebar DOM on every assistant turn (#507)
 
@@ -1192,7 +1194,8 @@ This release establishes Clawterm's visual identity, transforming the app from a
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/clawterm/clawterm/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/clawterm/clawterm/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/clawterm/clawterm/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/clawterm/clawterm/compare/v1.3.0...v1.3.1
