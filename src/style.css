@@ -120,8 +120,6 @@
   --traffic-close: #ff5f57;
   --traffic-minimize: #febc2e;
   --traffic-maximize: #28c840;
-  --win-close-hover: #e81123;
-  --win-close-text: #fff;
 
   /* ── Z-index scale ───────────────────────────────────────────────────── */
   --z-pane-overlay: 5;
@@ -492,44 +490,6 @@ body {
 
 .traffic-light.maximize {
   background: var(--traffic-maximize);
-}
-
-/* Windows-style window controls (top-right) */
-#window-controls {
-  display: flex;
-  height: 100%;
-}
-
-.win-ctrl {
-  /* Off-grid 46px is the canonical Windows window-control button width
-     (Microsoft's caption-button spec); kept inline so a future widescale
-     "make everything 4-grid" sweep doesn't break native-feeling chrome. */
-  width: 46px;
-  height: 100%;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--transition-speed);
-}
-
-.win-ctrl:hover {
-  background: var(--bg-active);
-  color: var(--text-primary);
-}
-
-.win-ctrl.close:hover {
-  background: var(--win-close-hover);
-  color: var(--win-close-text);
-}
-
-.titlebar-win {
-  padding-left: var(--space-4);
-  padding-right: 0;
 }
 
 .titlebar-mac {
