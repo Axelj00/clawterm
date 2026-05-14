@@ -60,13 +60,7 @@ export class TabRenderer {
    * Render the tab list in the sidebar. Creates new DOM entries for new tabs,
    * updates existing entries, and removes entries for closed tabs.
    */
-  renderTabList(
-    list: HTMLElement,
-    tabs: Map<string, Tab>,
-    activeTabId: string | null,
-    _groupByState = true,
-    _expandActiveTab = false,
-  ) {
+  renderTabList(list: HTMLElement, tabs: Map<string, Tab>, activeTabId: string | null) {
     // Remove elements for closed tabs
     for (const [id, el] of this.tabElements) {
       if (!tabs.has(id)) {
@@ -79,7 +73,7 @@ export class TabRenderer {
 
     let index = 0;
     for (const [id, tab] of tabs) {
-      this.renderTabEntry(list, id, tab, activeTabId, index, index);
+      this.renderTabEntry(list, id, tab, activeTabId, index);
       index++;
     }
   }
@@ -90,7 +84,6 @@ export class TabRenderer {
     tab: Tab,
     activeTabId: string | null,
     domIndex: number,
-    _tabIndex: number,
   ) {
     let entry = this.tabElements.get(id);
 

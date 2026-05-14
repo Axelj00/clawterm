@@ -2137,13 +2137,7 @@ export class TerminalManager {
     const start = performance.now();
     const list = document.getElementById("tab-list")!;
     const visible = this.visibleTabs;
-    this.tabRenderer.renderTabList(
-      list,
-      visible,
-      this.activeTabId,
-      this.config.sidebar.groupByState,
-      this.config.sidebar.expandActiveTab,
-    );
+    this.tabRenderer.renderTabList(list, visible, this.activeTabId);
     // Update workspace panel alongside tab list
     this.workspacePanel.update(visible, this.activeTabId);
     // Update project bar highlight

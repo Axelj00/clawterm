@@ -73,8 +73,6 @@ Unknown fields are ignored. Invalid values are logged and replaced with the defa
 | --- | --- | --- | --- | --- |
 | `sidebar.width` | `number` | `200` | `100`–`600` | Sidebar width in pixels. |
 | `sidebar.position` | `"left" \| "right"` | `"left"` | — | Which side the sidebar appears on. |
-| `sidebar.groupByState` | `boolean` | `true` | — | Group tabs by state (agents / servers / shells). |
-| `sidebar.expandActiveTab` | `boolean` | `false` | — | Expand the active tab with rich agent details. |
 
 ## Keybindings
 

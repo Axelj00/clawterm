@@ -75,8 +75,6 @@ export const DEFAULT_CONFIG: Config = {
   sidebar: {
     width: 200,
     position: "left",
-    groupByState: true,
-    expandActiveTab: false,
   },
   keybindings: {
     newTab: `${modKey}+t`,

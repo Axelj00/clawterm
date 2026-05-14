@@ -25,10 +25,6 @@ export interface Config {
   sidebar: {
     width: number;
     position: "left" | "right";
-    /** Group tabs by state: agents, servers, shells (#334). Default: true */
-    groupByState: boolean;
-    /** Expand active tab with rich agent details (#342). Default: false */
-    expandActiveTab: boolean;
   };
   keybindings: {
     newTab: string;
