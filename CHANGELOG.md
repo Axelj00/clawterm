@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Sidebar tabs now show a Claude Code context-window bar + N% per tab** — previously you had to click into a tab to find out how much context a Claude session had used. The bar now lives on every tab header whose pane has a Claude statusLine, using the same ok / warn / crit color thresholds (60% / 85%) as the pane footer so the two surfaces never diverge. Multi-pane tabs show the max % across panes on the header AND a per-pane % column inside the sub-list, so you can also see *which* pane is burning context. Plain shells render no bar and reserve no space — the indicator is opt-in by the presence of Claude data. CSS extracted to a shared `.context-bar` / `.context-bar-fill` family so the sidebar and footer can't drift on width, color, or fill behaviour. Snapshot diffing buckets to nearest 5% so typing in Claude doesn't repaint sidebar DOM on every assistant turn (#507)
+
+### Changed
+- **The `context-near-limit` attention dot is gone** — the new sidebar bar already paints the same threshold (≥85% → crit red), so the orange dot was redundant. The `rate-limit-near` and `compaction-imminent` dots stay; they encode signals the bar can't express on its own (#507)
+
+
 ## [1.4.0] - 2026-05-14
 
 ### Added
