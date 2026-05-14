@@ -6,6 +6,7 @@ import {
   formatElapsed,
   parseStatusLine,
   deriveClaudeAttention,
+  deriveClaudeContextPct,
   type TabState,
   type StatusLineData,
 } from "../src/tab-state";
@@ -205,11 +206,11 @@ describe("deriveClaudeAttention", () => {
     expect(deriveClaudeAttention([make()])).toBeNull();
   });
 
-  it("flags context-near-limit at 85%", () => {
+  it("no longer flags context-near-limit (the sidebar bar supersedes it, #507)", () => {
     const sl = make({
       contextWindow: { inputTokens: 1, outputTokens: 1, contextWindowSize: 200000, usedPercentage: 85, remainingPercentage: 15 },
     });
-    expect(deriveClaudeAttention([sl])).toBe("context-near-limit");
+    expect(deriveClaudeAttention([sl])).toBeNull();
   });
 
   it("flags rate-limit-near at 90% (fiveHour or sevenDay)", () => {
@@ -219,7 +220,7 @@ describe("deriveClaudeAttention", () => {
     expect(deriveClaudeAttention([seven])).toBe("rate-limit-near");
   });
 
-  it("flags compaction-imminent only when exceeds_200k AND ctx ≥95%", () => {
+  it("flags compaction-imminent only when exceeds_200k AND ctx >= 95%", () => {
     const onlyFlag = make({ exceeds200kTokens: true });
     const onlyCtx = make({
       contextWindow: { inputTokens: 1, outputTokens: 1, contextWindowSize: 200000, usedPercentage: 96, remainingPercentage: 4 },
@@ -229,19 +230,52 @@ describe("deriveClaudeAttention", () => {
       contextWindow: { inputTokens: 1, outputTokens: 1, contextWindowSize: 200000, usedPercentage: 96, remainingPercentage: 4 },
     });
     expect(deriveClaudeAttention([onlyFlag])).toBeNull();
-    expect(deriveClaudeAttention([onlyCtx])).toBe("context-near-limit");
+    // Plain >=95% without exceeds200k is no longer a dot — bar shows crit color (#507)
+    expect(deriveClaudeAttention([onlyCtx])).toBeNull();
     expect(deriveClaudeAttention([both])).toBe("compaction-imminent");
   });
 
   it("picks the highest-rank signal across panes", () => {
-    const ctxNear = make({
-      contextWindow: { inputTokens: 1, outputTokens: 1, contextWindowSize: 200000, usedPercentage: 86, remainingPercentage: 14 },
-    });
+    const rateLimit = make({ rateLimits: { fiveHour: { usedPercentage: 92, resetsAt: 0 } } });
     const compact = make({
       exceeds200kTokens: true,
       contextWindow: { inputTokens: 1, outputTokens: 1, contextWindowSize: 200000, usedPercentage: 96, remainingPercentage: 4 },
     });
-    expect(deriveClaudeAttention([ctxNear, compact])).toBe("compaction-imminent");
+    expect(deriveClaudeAttention([rateLimit, compact])).toBe("compaction-imminent");
+  });
+});
+
+describe("deriveClaudeContextPct", () => {
+  const make = (used: number | null | undefined): StatusLineData => ({
+    sessionId: "s",
+    model: { id: "x", displayName: "X" },
+    contextWindow:
+      used == null
+        ? undefined
+        : {
+            inputTokens: 0,
+            outputTokens: 0,
+            contextWindowSize: 200000,
+            usedPercentage: used,
+            remainingPercentage: 100 - used,
+          },
+  });
+
+  it("returns null when no pane has a contextWindow", () => {
+    expect(deriveClaudeContextPct([])).toBeNull();
+    expect(deriveClaudeContextPct([make(undefined)])).toBeNull();
+  });
+
+  it("returns the single pane's percentage", () => {
+    expect(deriveClaudeContextPct([make(42)])).toBe(42);
+  });
+
+  it("returns the MAX across panes (most-loaded wins)", () => {
+    expect(deriveClaudeContextPct([make(20), make(78), make(45)])).toBe(78);
+  });
+
+  it("ignores panes without a contextWindow when computing the max", () => {
+    expect(deriveClaudeContextPct([make(undefined), make(33)])).toBe(33);
   });
 });
 

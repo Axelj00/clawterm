@@ -62,8 +62,10 @@ function renderClaudeMetrics(row: HTMLElement, sl: StatusLineData): void {
     const used = sl.contextWindow.usedPercentage;
     const wrap = pushSpan(row, "footer-claude-context", "");
     const level = used >= 85 ? "crit" : used >= 60 ? "warn" : "ok";
-    const bar = pushSpan(wrap, `footer-claude-context-bar footer-claude-context-bar-${level}`, "");
-    const fill = pushSpan(bar, "footer-claude-context-fill", "");
+    // .context-bar is the shared bar layout (sidebar uses it too, #507);
+    // the footer wrapper still owns gap/inline-flex.
+    const bar = pushSpan(wrap, `context-bar context-bar-${level}`, "");
+    const fill = pushSpan(bar, "context-bar-fill", "");
     fill.style.width = `${Math.min(100, Math.max(0, used)).toFixed(0)}%`;
     pushSpan(wrap, "footer-claude-context-label", `${used.toFixed(0)}%`);
     if (sl.exceeds200kTokens) {

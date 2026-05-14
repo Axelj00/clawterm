@@ -189,18 +189,21 @@ export function parseStatusLine(json: string): StatusLineData | null {
   return out;
 }
 
-export type ClaudeAttention = "context-near-limit" | "rate-limit-near" | "compaction-imminent" | null;
+export type ClaudeAttention = "rate-limit-near" | "compaction-imminent" | null;
 
 const ATTENTION_RANK: Record<NonNullable<ClaudeAttention>, number> = {
-  "compaction-imminent": 3,
-  "rate-limit-near": 2,
-  "context-near-limit": 1,
+  "compaction-imminent": 2,
+  "rate-limit-near": 1,
 };
 const rankAttention = (a: ClaudeAttention): number => (a ? ATTENTION_RANK[a] : 0);
 
 /**
  * Aggregate Claude attention signal across panes. Returns the most
- * urgent signal (compaction-imminent > rate-limit-near > context-near-limit).
+ * urgent signal (compaction-imminent > rate-limit-near).
+ *
+ * Context-near-limit (≥85%) is no longer surfaced as a dot — the
+ * sidebar context bar (#507) renders the same threshold in crit color,
+ * making the dot redundant.
  */
 export function deriveClaudeAttention(panes: readonly StatusLineData[]): ClaudeAttention {
   let best: ClaudeAttention = null;
@@ -215,11 +218,25 @@ export function deriveClaudeAttention(panes: readonly StatusLineData[]): ClaudeA
       const five = sl.rateLimits?.fiveHour?.usedPercentage ?? 0;
       const seven = sl.rateLimits?.sevenDay?.usedPercentage ?? 0;
       if (five >= 90 || seven >= 90) signal = "rate-limit-near";
-      else if (used != null && used >= 85) signal = "context-near-limit";
     }
     if (rankAttention(signal) > rankAttention(best)) best = signal;
   }
   return best;
+}
+
+/**
+ * Max `usedPercentage` across panes — the value the sidebar bar
+ * renders. Returns null when no pane has a Claude statusLine, so the
+ * renderer can hide the bar entirely rather than show "0%". (#507)
+ */
+export function deriveClaudeContextPct(panes: readonly StatusLineData[]): number | null {
+  let max: number | null = null;
+  for (const sl of panes) {
+    const used = sl.contextWindow?.usedPercentage;
+    if (used == null) continue;
+    if (max == null || used > max) max = used;
+  }
+  return max;
 }
 
 /** Per-pane state — tracks each pane independently */
@@ -265,6 +282,9 @@ export interface TabState {
   notification: NotificationType;
   /** Aggregated Claude Code attention signal across panes. */
   claudeAttention: ClaudeAttention;
+  /** Max context-window `usedPercentage` across panes; null when no pane has
+   *  a Claude statusLine. Sidebar renders the bar from this. (#507) */
+  claudeContextPct: number | null;
 }
 
 export function createDefaultTabState(): TabState {
@@ -279,6 +299,7 @@ export function createDefaultTabState(): TabState {
     gitStatus: null,
     notification: null,
     claudeAttention: null,
+    claudeContextPct: null,
   };
 }
 

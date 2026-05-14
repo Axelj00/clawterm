@@ -9,13 +9,25 @@ interface ChildRefs {
   detail: HTMLElement;
   paneList: HTMLElement;
   claudeDot: HTMLElement;
+  /** Context-usage bar shown when any pane has a Claude statusLine (#507). */
+  claudeContext: HTMLElement;
+  claudeContextBar: HTMLElement;
+  claudeContextFill: HTMLElement;
+  claudeContextLabel: HTMLElement;
 }
 
 const CLAUDE_DOT_LABEL: Record<string, string> = {
-  "context-near-limit": "Context near limit",
   "rate-limit-near": "Rate limit approaching",
   "compaction-imminent": "Auto-compaction imminent",
 };
+
+/** Map a 0–100 percentage to the ok/warn/crit color thresholds shared
+ *  with the footer bar (`pane.ts:renderClaudeMetrics`). (#507) */
+function contextLevel(pct: number): "ok" | "warn" | "crit" {
+  if (pct >= 85) return "crit";
+  if (pct >= 60) return "warn";
+  return "ok";
+}
 
 export interface TabRenderActions {
   closeTab(id: string): void;
@@ -132,6 +144,20 @@ export class TabRenderer {
       refs.claudeDot.removeAttribute("aria-label");
     }
 
+    // Context bar — only when any pane in the tab has Claude statusLine.
+    // null means no Claude anywhere in the tab; render nothing and reserve
+    // no space so plain shells stay clean. (#507)
+    const ctxPct = tab.state.claudeContextPct;
+    if (ctxPct != null) {
+      const level = contextLevel(ctxPct);
+      refs.claudeContext.style.display = "";
+      refs.claudeContextBar.className = `context-bar context-bar-${level}`;
+      refs.claudeContextFill.style.width = `${Math.min(100, Math.max(0, ctxPct)).toFixed(0)}%`;
+      refs.claudeContextLabel.textContent = `${ctxPct.toFixed(0)}%`;
+    } else {
+      refs.claudeContext.style.display = "none";
+    }
+
     // Ensure correct order in DOM
     const refChild = domIndex < list.children.length ? list.children[domIndex] : null;
     if (entry !== refChild) {
@@ -167,7 +193,23 @@ export class TabRenderer {
     claudeDot.className = "tab-claude-dot";
     claudeDot.style.display = "none";
 
+    // Context bar (#507) — wrapper + bar/fill + numeric label. Sibling of
+    // .tab-title (not nested), so the rename-input swap doesn't tear it out.
+    const claudeContext = document.createElement("span");
+    claudeContext.className = "tab-claude-context";
+    claudeContext.style.display = "none";
+    const claudeContextBar = document.createElement("span");
+    claudeContextBar.className = "context-bar";
+    const claudeContextFill = document.createElement("span");
+    claudeContextFill.className = "context-bar-fill";
+    claudeContextBar.appendChild(claudeContextFill);
+    const claudeContextLabel = document.createElement("span");
+    claudeContextLabel.className = "tab-claude-context-label";
+    claudeContext.appendChild(claudeContextBar);
+    claudeContext.appendChild(claudeContextLabel);
+
     header.appendChild(title);
+    header.appendChild(claudeContext);
     header.appendChild(claudeDot);
     header.appendChild(hint);
     header.appendChild(close);
@@ -234,7 +276,18 @@ export class TabRenderer {
     });
 
     this.tabElements.set(id, entry);
-    this.tabChildRefs.set(id, { header, title, hint, detail, paneList, claudeDot });
+    this.tabChildRefs.set(id, {
+      header,
+      title,
+      hint,
+      detail,
+      paneList,
+      claudeDot,
+      claudeContext,
+      claudeContextBar,
+      claudeContextFill,
+      claudeContextLabel,
+    });
     list.appendChild(entry);
 
     return entry;
@@ -260,6 +313,8 @@ export class TabRenderer {
     const panes = tab.getPanes();
 
     // Grow or shrink the row set to match pane count, reusing existing rows.
+    // Each row carries a .tab-pane-line-label (branch / folder) and an
+    // optional .tab-pane-line-pct (Claude context % when statusLine present).
     while (paneList.children.length > paneStates.length) {
       paneList.lastElementChild?.remove();
     }
@@ -267,6 +322,13 @@ export class TabRenderer {
       const row = document.createElement("div");
       row.className = "tab-pane-line";
       const idx = paneList.children.length;
+      const label = document.createElement("span");
+      label.className = "tab-pane-line-label";
+      const pct = document.createElement("span");
+      pct.className = "tab-pane-line-pct";
+      pct.style.display = "none";
+      row.appendChild(label);
+      row.appendChild(pct);
       row.addEventListener("click", (e) => {
         e.stopPropagation();
         this.actions.focusPane?.(tabId, idx);
@@ -276,7 +338,17 @@ export class TabRenderer {
 
     for (let i = 0; i < paneStates.length; i++) {
       const row = paneList.children[i] as HTMLElement;
-      row.textContent = paneRowLabel(paneStates[i]);
+      const label = row.querySelector<HTMLElement>(".tab-pane-line-label")!;
+      const pct = row.querySelector<HTMLElement>(".tab-pane-line-pct")!;
+      label.textContent = paneRowLabel(paneStates[i]);
+      const used = paneStates[i].statusLine?.contextWindow?.usedPercentage;
+      if (used != null) {
+        pct.style.display = "";
+        pct.textContent = `${used.toFixed(0)}%`;
+        pct.className = `tab-pane-line-pct tab-pane-line-pct-${contextLevel(used)}`;
+      } else {
+        pct.style.display = "none";
+      }
       row.classList.toggle("focused", panes[i] === focused);
       row.setAttribute("data-pane-index", String(i));
     }
@@ -285,7 +357,12 @@ export class TabRenderer {
   /** Status bar removed — replaced by per-pane footers (#348). */
   updateStatusBar(_state: TabState | null) {}
 
-  /** Build a snapshot string for change detection. */
+  /** Build a snapshot string for change detection.
+   *
+   *  Claude context % is bucketed to nearest 5 so typing in Claude (which
+   *  fires a new statusLine on every turn) doesn't repaint the sidebar DOM
+   *  on every 1% tick — the fill `width` is set imperatively, so smooth
+   *  crossing within a bucket doesn't require a snapshot diff. (#507) */
   computeTabSnapshot(tabs: Map<string, Tab>, activeTabId: string | null): string {
     const parts: string[] = [];
     for (const [id, tab] of tabs) {
@@ -300,9 +377,19 @@ export class TabRenderer {
       // without forcing a full re-render from the caller. (#433)
       const panes = tab.getPaneStates();
       const focusedIdx = tab.getPanes().indexOf(tab.getFocusedPane());
-      const paneSnap = panes.length > 1 ? `${focusedIdx}:${panes.map((p) => paneRowLabel(p)).join(",")}` : "";
+      const paneCtx = panes
+        .map((p) => {
+          const u = p.statusLine?.contextWindow?.usedPercentage;
+          return u == null ? "" : String(Math.round(u / 5) * 5);
+        })
+        .join(",");
+      const paneSnap =
+        panes.length > 1
+          ? `${focusedIdx}:${panes.map((p) => paneRowLabel(p)).join(",")}:${paneCtx}`
+          : paneCtx;
+      const ctxSnap = s.claudeContextPct == null ? "" : String(Math.round(s.claudeContextPct / 5) * 5);
       parts.push(
-        `${id}|${tab.title}|${s.needsAttention}|${s.serverPort}|${s.lastError}|${s.gitBranch}|${gitSnap}|${s.folderName}|${s.notification}|${tab.pinned}|${tab.muted}|${paneSnap}|${s.claudeAttention ?? ""}`,
+        `${id}|${tab.title}|${s.needsAttention}|${s.serverPort}|${s.lastError}|${s.gitBranch}|${gitSnap}|${s.folderName}|${s.notification}|${tab.pinned}|${tab.muted}|${paneSnap}|${s.claudeAttention ?? ""}|${ctxSnap}`,
       );
     }
     parts.push(`active:${activeTabId}`);

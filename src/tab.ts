@@ -10,6 +10,7 @@ import {
   computeFolderTitle,
   parseStatusLine,
   deriveClaudeAttention,
+  deriveClaudeContextPct,
   type StatusLineData,
 } from "./tab-state";
 import type { OutputEvent } from "./matchers";
@@ -893,6 +894,7 @@ export class Tab {
     const statusLines: StatusLineData[] = [];
     for (const p of this.panes) if (p.state.statusLine) statusLines.push(p.state.statusLine);
     this.state.claudeAttention = deriveClaudeAttention(statusLines);
+    this.state.claudeContextPct = deriveClaudeContextPct(statusLines);
 
     logger.debug(`[deriveTabState] tab=${this.id} folder=${this.state.folderName}`);
   }

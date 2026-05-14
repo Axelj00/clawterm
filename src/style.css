@@ -663,6 +663,67 @@ body {
   color: var(--text-secondary);
 }
 
+/* Branch / folder label inside the pane row — shrink first, ellipsis when
+   crowded by the % cell. The % stays fixed-width and visible. (#507) */
+.tab-pane-line-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-pane-line-pct {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-xs);
+  flex-shrink: 0;
+}
+.tab-pane-line-pct-ok {
+  color: var(--color-green);
+}
+.tab-pane-line-pct-warn {
+  color: var(--color-orange);
+}
+.tab-pane-line-pct-crit {
+  color: var(--color-red);
+}
+
+/* Context bar in the sidebar tab header. Sibling of .tab-title so the
+   rename-input swap can't take the bar with it. (#507) */
+.tab-claude-context {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.tab-claude-context .context-bar {
+  /* Slightly shorter than the footer's 56px — sidebar has less room. */
+  width: 40px;
+}
+
+.tab-claude-context-label {
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
+/* Active row uses --bg-elevated for its background, so the bar's default
+   --bg-elevated track would disappear. Override to a contrasting surface
+   color on the active row only. */
+.tab-entry.active .tab-claude-context .context-bar {
+  background: var(--bg-surface);
+}
+
+/* Slim sidebar (<120px): hide the numeric label and shrink the bar so
+   the title + close button still fit. Hue alone encodes urgency in this
+   mode — acceptable tradeoff for users who opted into reduced density. */
+.sidebar-slim .tab-claude-context-label {
+  display: none;
+}
+.sidebar-slim .tab-claude-context .context-bar {
+  width: 28px;
+}
+
 .tab-entry.active .tab-pane-line.focused {
   color: var(--text-primary);
   font-weight: var(--font-weight-medium);
@@ -1395,7 +1456,11 @@ body {
   gap: var(--space-1);
 }
 
-.footer-claude-context-bar {
+/* Shared context-window bar — used by both the pane footer and the
+   sidebar tab entry so the two surfaces stay in lockstep on width,
+   color thresholds, and fill behaviour (#507). Per-surface wrappers
+   add their own layout (.footer-claude-context, .tab-claude-context). */
+.context-bar {
   position: relative;
   display: inline-block;
   width: 56px;
@@ -1403,9 +1468,10 @@ body {
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
-.footer-claude-context-fill {
+.context-bar-fill {
   position: absolute;
   inset: 0;
   width: 0%;
@@ -1413,13 +1479,13 @@ body {
   border-radius: var(--radius-sm);
 }
 
-.footer-claude-context-bar-ok .footer-claude-context-fill {
+.context-bar-ok .context-bar-fill {
   background: var(--color-green);
 }
-.footer-claude-context-bar-warn .footer-claude-context-fill {
+.context-bar-warn .context-bar-fill {
   background: var(--color-orange);
 }
-.footer-claude-context-bar-crit .footer-claude-context-fill {
+.context-bar-crit .context-bar-fill {
   background: var(--color-red);
 }
 
@@ -1472,10 +1538,6 @@ body {
   margin: 0 var(--space-2);
   flex-shrink: 0;
   vertical-align: middle;
-}
-.tab-claude-dot-context-near-limit {
-  background: var(--color-orange);
-  box-shadow: 0 0 4px rgba(245, 166, 35, 0.6);
 }
 .tab-claude-dot-rate-limit-near {
   background: var(--color-red);
