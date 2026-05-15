@@ -20,13 +20,14 @@
   --text-secondary: rgba(244, 244, 245, 0.55);
   --text-tertiary: rgba(244, 244, 245, 0.35);
 
-  /* Accent — stays near-white in this PR. #527 audits decoration call
-     sites and then flips --accent to Command Green #7CFF4F in one PR
-     so main is never left half-broken. */
-  --accent: rgba(244, 244, 245, 0.8);
-  --accent-hover: rgba(244, 244, 245, 0.9);
-  --accent-muted: rgba(244, 244, 245, 0.08);
-  --accent-border: rgba(244, 244, 245, 0.2);
+  /* Accent — Command Green. Reserved for active state: active tab,
+     focused pane, primary execution CTA, terminal cursor, focus ring,
+     and status indicators. Decoration must not use this token; see
+     docs/brand.md § Green-usage rule. */
+  --accent: #7cff4f;
+  --accent-hover: #8fff6a;
+  --accent-muted: rgba(124, 255, 79, 0.12);
+  --accent-border: rgba(124, 255, 79, 0.35);
   --accent-on: #050607;
 
   /* Borders */
