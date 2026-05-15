@@ -987,10 +987,10 @@ export class Pane {
       if (TRUSTED_AGENT_PROCESSES.has(name)) return true;
       // Fast path missed: foreground is e.g. a tool subshell. Walk up to
       // the pty's shell looking for a trusted ancestor.
-      const ancestors = await invoke<Array<{ pid: number; name: string }>>(
-        "get_process_ancestors",
-        { startPid: fgPid, stopPid: shellPid },
-      );
+      const ancestors = await invoke<Array<{ pid: number; name: string }>>("get_process_ancestors", {
+        startPid: fgPid,
+        stopPid: shellPid,
+      });
       return isTrustedAgentForeground(name, ancestors);
     } catch (e) {
       logger.debug("foregroundIsTrustedAgent: lookup failed", e);

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-05-15
+
+### Added
+- **Cmd+V now pastes images into Claude Code's prompt** — Claude Code already pulls clipboard images from NSPasteboard via `osascript` when it receives Ctrl+V (`\x16`), but Cmd+V was just calling `readText()`, which returns `""` for image-only clipboards so nothing reached the TUI. The Edit-menu paste handler now inspects the clipboard for `image/*` types; if it finds one and the focused pane's foreground is a trusted agent, it sends Ctrl+V to the pty and lets Claude Code handle the rest. Text clipboards and shell panes are unaffected (#520)
+
+### Fixed
+- **Claude Code statusLine row no longer disappears after 30 seconds of idle** — the row (model name + context bar + effort + thinking dot + `>200k` tag) was hidden on both the pane footer and the sidebar tab entry whenever the on-disk per-turn JSON went "stale", because the Rust reader treated any file older than 30s as untrustworthy. But the writer only fires on assistant turns, so simply reading a long response was enough to nuke the indicator. The stale gate is now gated on whether the keyed PID is still alive (via `kill(pid, 0)`) instead of mtime, and a startup sweep removes orphan files left by dead Claude sessions so `/tmp/clawterm-status/` stays bounded across runs (#521)
+- **Paste-confirm dialog no longer fires for Claude Code during tool calls** — the trust gate added in #508 only inspected the immediate foreground PID, which briefly becomes a tool subshell (zsh / bash / node) whenever Claude runs a Bash tool. The dialog then fired even though `claude` was still the session driver. The gate now walks up the parent chain back to the pane's shell and trusts the paste if any ancestor matches the trusted-agent allowlist, capped at 8 hops via a new `proc_ppid` lookup. Also skips the dialog when the pty isn't initialized yet, which removed a confusing modal race during pane startup. Extracted the pure trust decision so it has real test coverage (#519)
+
+
 ## [1.4.2] - 2026-05-14
 
 ### Removed
@@ -1200,7 +1210,8 @@ This release establishes Clawterm's visual identity, transforming the app from a
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/clawterm/clawterm/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/clawterm/clawterm/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/clawterm/clawterm/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/clawterm/clawterm/compare/v1.3.2...v1.4.0

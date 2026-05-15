@@ -1222,9 +1222,7 @@ export class TerminalManager {
   private async dispatchPaste(pane: Pane): Promise<void> {
     try {
       const items = await navigator.clipboard.read();
-      const hasImage = items.some((item) =>
-        item.types.some((t) => t.startsWith("image/")),
-      );
+      const hasImage = items.some((item) => item.types.some((t) => t.startsWith("image/")));
       if (hasImage && (await pane.isTrustedAgentForeground())) {
         pane.writeToPty("\x16");
         return;

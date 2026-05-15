@@ -10,10 +10,7 @@ export const TRUSTED_AGENT_PROCESSES: ReadonlySet<string> = new Set(["claude"]);
  *  agent (e.g. `claude`) spawned a subshell or helper that briefly
  *  became the pane's foreground — we still want to recognize that a
  *  trusted agent is the session driver. (#519) */
-export function isTrustedAgentForeground(
-  name: string,
-  ancestors: ReadonlyArray<{ name: string }>,
-): boolean {
+export function isTrustedAgentForeground(name: string, ancestors: ReadonlyArray<{ name: string }>): boolean {
   if (TRUSTED_AGENT_PROCESSES.has(name)) return true;
   return ancestors.some((node) => TRUSTED_AGENT_PROCESSES.has(node.name));
 }
