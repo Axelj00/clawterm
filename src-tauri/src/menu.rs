@@ -98,6 +98,7 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, ctx: &MenuContext) -> tauri::Resul
         .build()?;
 
     let file_submenu = SubmenuBuilder::new(app, "File")
+        .item(&item(app, "createWindow", "New Window", ctx)?)
         .item(&item(app, "createTab", "New Tab", ctx)?)
         .item(&item(app, "openWorktreeDialog", "New Agent Tab on Branch…", ctx)?)
         .item(&item(app, "newProject", "New Project", ctx)?)

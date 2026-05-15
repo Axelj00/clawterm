@@ -98,6 +98,7 @@ export const DEFAULT_CONFIG: Config = {
     nextProject: `${modKey}+alt+]`,
     prevProject: `${modKey}+alt+[`,
     newProject: "",
+    newWindow: `${modKey}+n`,
     newWorktreeTab: `${modKey}+shift+n`,
     toggleWorkspacePanel: `${modKey}+shift+b`,
     jumpToBranch: `${modKey}+shift+g`,

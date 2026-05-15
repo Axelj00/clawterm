@@ -7,6 +7,7 @@ import { isPrimaryMod } from "./utils";
  */
 export interface KeybindingActions {
   createTab(): void;
+  createWindow(): void;
   closeActiveTab(): void;
   nextTab(): void;
   prevTab(): void;
@@ -53,6 +54,12 @@ export function createKeyHandler(
     if (matchesKeybinding(e, kb.newTab)) {
       e.preventDefault();
       actions.createTab();
+      return false;
+    }
+
+    if (kb.newWindow && matchesKeybinding(e, kb.newWindow)) {
+      e.preventDefault();
+      actions.createWindow();
       return false;
     }
 

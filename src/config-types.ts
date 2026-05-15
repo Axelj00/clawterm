@@ -48,6 +48,7 @@ export interface Config {
     nextProject: string;
     prevProject: string;
     newProject: string;
+    newWindow: string;
     [key: string]: string;
   };
   quickCommands: Record<string, string>;

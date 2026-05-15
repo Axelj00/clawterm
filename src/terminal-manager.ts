@@ -65,6 +65,7 @@ function updateSidebarMode(width: number): void {
  *  the keybinding handler keeps firing on the raw key event. */
 const KEYBINDING_TO_MENU_ID: Record<keyof Config["keybindings"], string> = {
   newTab: "createTab",
+  newWindow: "createWindow",
   closeTab: "closeActiveTab",
   nextTab: "nextTab",
   prevTab: "prevTab",
@@ -245,6 +246,9 @@ export class TerminalManager {
 
     const actions: KeybindingActions = {
       createTab: () => this.createTab(),
+      createWindow: () => {
+        void openNewWindow();
+      },
       closeActiveTab: () => {
         if (this.activeTabId) this.closeTab(this.activeTabId);
       },
