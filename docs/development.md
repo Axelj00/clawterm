@@ -6,11 +6,9 @@ How to be productive in the ClawTerm codebase. Aimed at new contributors and AI 
 
 ## Prerequisites
 
+- **macOS** (ClawTerm is macOS-only) with Xcode Command Line Tools (`xcode-select --install`)
 - **Rust** (stable) — `rustup install stable` if missing
 - **Node.js 18+** (Node 24 is what CI uses)
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Linux**: the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your distro
-- **Windows**: Visual Studio Build Tools with C++ workload
 
 Check everything works:
 
@@ -89,22 +87,11 @@ Logs are also kept in an in-memory **circular buffer of the last 2000 entries**,
 
 **There are no log files on disk.** If you need persistent logs across sessions, copy them out of the buffer manually before reload, or pipe `stdout`/`stderr` of `npm run tauri dev` to a file.
 
-The Tauri webview also writes its own native logs to OS-standard locations:
-
-| Platform | Webview log dir |
-| --- | --- |
-| macOS | `~/Library/Logs/com.clawterm.clawterm/` |
-| Windows | `%LOCALAPPDATA%\com.clawterm.clawterm\logs\` |
-| Linux | `~/.local/share/com.clawterm.clawterm/logs/` |
-
-These are mostly empty unless something crashed at the Tauri/webview layer.
+The Tauri webview also writes its own native logs to `~/Library/Logs/com.clawterm.clawterm/`. These are mostly empty unless something crashed at the Tauri/webview layer.
 
 ## DevTools
 
-In dev builds (`npm run tauri dev`), the Tauri webview includes Chromium DevTools. To open them:
-
-- **macOS**: right-click → **Inspect Element**
-- **Windows / Linux**: F12 (default Chromium binding)
+In dev builds (`npm run tauri dev`), the Tauri webview includes Chromium DevTools. Right-click → **Inspect Element** to open them.
 
 DevTools are enabled by Tauri's default dev profile. There's no in-app keybinding to toggle them — modifying that would mean teaching the keybinding handler to call out to the Tauri webview API, which we haven't done.
 
@@ -137,7 +124,7 @@ Or call `perfMetrics.record("label", durationMs)` directly if you have your own 
 
 ## Reloading config without restart
 
-`Cmd+Shift+R` (`Ctrl+Shift+R` on Windows/Linux) — bound to `reloadConfig` in `keybindings`. Calls `TerminalManager.reloadConfig()` which:
+`Cmd+Shift+R` — bound to `reloadConfig` in `keybindings`. Calls `TerminalManager.reloadConfig()` which:
 
 1. Re-reads `~/.config/clawterm/config.json` from disk
 2. Validates and falls back per-field on bad values
@@ -150,20 +137,17 @@ Takes ~50–200 ms total. Much faster than killing and restarting the dev build.
 
 ## Where things live on disk
 
-| Thing | macOS / Linux | Windows |
-| --- | --- | --- |
-| Config | `~/.config/clawterm/config.json` | `%APPDATA%\clawterm\config.json` |
-| Session | `~/.config/clawterm/session.json` | `%APPDATA%\clawterm\session.json` |
-| Custom themes | `~/.config/clawterm/themes/` | `%APPDATA%\clawterm\themes\` |
-| Webview logs (Tauri) | `~/Library/Logs/com.clawterm.clawterm/` | `%LOCALAPPDATA%\com.clawterm.clawterm\logs\` |
+| Thing | Path |
+| --- | --- |
+| Config | `~/.config/clawterm/config.json` |
+| Session | `~/.config/clawterm/session.json` |
+| Custom themes | `~/.config/clawterm/themes/` |
+| Webview logs (Tauri) | `~/Library/Logs/com.clawterm.clawterm/` |
 
 Resetting ClawTerm completely:
 
 ```bash
-# macOS / Linux
 rm -rf ~/.config/clawterm
-# Windows
-Remove-Item -Recurse "$env:APPDATA\clawterm"
 ```
 
 A fresh `config.json` is written on next launch.
@@ -176,14 +160,7 @@ A fresh `config.json` is written on next launch.
 | `npm run tauri dev` | Runs from `dist/` and `src-tauri/target/debug/` |
 | `npm run tauri build` | Bundled installer in `src-tauri/target/release/bundle/` |
 
-Per-platform release bundles:
-
-| Platform | Path |
-| --- | --- |
-| macOS | `src-tauri/target/release/bundle/dmg/ClawTerm_<version>_*.dmg` |
-| Windows | `src-tauri/target/release/bundle/nsis/ClawTerm_<version>_x64-setup.exe` |
-| Linux (deb) | `src-tauri/target/release/bundle/deb/clawterm_<version>_amd64.deb` |
-| Linux (AppImage) | `src-tauri/target/release/bundle/appimage/ClawTerm_<version>_amd64.AppImage` |
+Release bundle: `src-tauri/target/release/bundle/dmg/ClawTerm_<version>_universal.dmg`.
 
 The Rust target dir is huge (~2 GB after a few builds). `cargo clean --manifest-path src-tauri/Cargo.toml` if you need the space.
 
@@ -191,8 +168,8 @@ The Rust target dir is huge (~2 GB after a few builds). `cargo clean --manifest-
 
 Workflows live in `.github/workflows/`:
 
-- **`ci.yml`** — runs on every push and PR. Frontend job (Ubuntu, Node 24): `npm run preflight:frontend`. Backend job (macOS, Windows, Linux): `cargo clippy -- -D warnings` + `cargo test`. Plus a version-sync check that asserts `package.json`, `tauri.conf.json`, and `Cargo.toml` agree.
-- **`release.yml`** — triggered by pushing a `vX.Y.Z` tag. Builds and publishes the GitHub Release with macOS / Windows / Linux artifacts. See [`RELEASING.md`](../RELEASING.md) for the full release workflow.
+- **`ci.yml`** — runs on every push and PR. Frontend job: `npm run preflight:frontend`. Backend job (macOS): `cargo clippy -- -D warnings` + `cargo test`. Plus a version-sync check that asserts `package.json`, `tauri.conf.json`, and `Cargo.toml` agree.
+- **`release.yml`** — triggered by pushing a `vX.Y.Z` tag. Builds and publishes the GitHub Release with the macOS universal artifact. See [`RELEASING.md`](../RELEASING.md) for the full release workflow.
 
 There are no pre-commit hooks installed by `npm install`. CI is the only gate. Run `npm run preflight` locally before pushing if you want fast feedback.
 
