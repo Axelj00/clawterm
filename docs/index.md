@@ -33,7 +33,7 @@ features:
 
 ## Quick links
 
-- [Installation & updates](./getting-started/installation) — install on macOS, Windows, build from source on Linux
+- [Installation & updates](./getting-started/installation) — install on macOS or build from source
 - [Configuration reference](./reference/configuration) — every key in `config.json`
 - [Keybindings reference](./reference/keybindings) — every shortcut, grouped by category
 - [Worktrees guide](./features/worktrees) — per-agent isolated branches

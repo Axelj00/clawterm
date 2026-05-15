@@ -183,7 +183,7 @@ Keybinding (under `keybindings`):
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `newWorktreeTab` | `Cmd+Shift+N` (macOS), `Ctrl+Shift+N` (Windows/Linux) | Open the new-worktree dialog |
+| `newWorktreeTab` | `Cmd+Shift+N` | Open the new-worktree dialog |
 
 ## Common workflows
 

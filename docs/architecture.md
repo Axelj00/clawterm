@@ -215,7 +215,7 @@ There is no shared state across commands beyond what each command derives from i
 
 Format and behaviour:
 
-- **Path**: `~/.config/clawterm/session.json` (macOS/Linux), `%APPDATA%\clawterm\session.json` (Windows)
+- **Path**: `~/.config/clawterm/session.json`
 - **Format**: V2 — `{ version: 2, projects: SessionProject[], activeProject: number }`. V1 (`{ tabs, activeIndex }`) is auto-wrapped into a single project on load.
 - **Per-tab record**: `{ title?, cwd, splits?, pinned?, muted?, manualTitle?, worktreePath?, repoRoot? }`
 - **Splits**: recursive `SessionSplitNode` mirroring the in-memory `SplitNode` tree.

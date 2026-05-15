@@ -1,13 +1,8 @@
 # Configuration
 
-ClawTerm reads its configuration from a single JSON file:
+ClawTerm reads its configuration from `~/.config/clawterm/config.json`.
 
-| Platform | Path |
-| --- | --- |
-| macOS / Linux | `~/.config/clawterm/config.json` |
-| Windows | `%APPDATA%\clawterm\config.json` |
-
-The file is created with defaults the first time ClawTerm launches. Reload it at runtime with **`Mod+Shift+R`** (or restart the app).
+The file is created with defaults the first time ClawTerm launches. Reload it at runtime with **`Cmd+Shift+R`** (or restart the app).
 
 **Source of truth:** [`src/config-types.ts`](../../src/config-types.ts) (schema) and [`src/config.ts`](../../src/config.ts) (defaults and validation).
 
@@ -42,8 +37,8 @@ Unknown fields are ignored. Invalid values are logged and replaced with the defa
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `shell` | `string` | `/bin/zsh` (macOS/Linux), `powershell.exe` (Windows) | Absolute path to the shell binary. If the path is missing or not executable, ClawTerm falls back to the platform default and shows a toast. |
-| `shellArgs` | `string[]` | `["--login"]` (POSIX), `["-NoLogo"]` (PowerShell), `[]` (cmd), `["-l"]` (nu/nushell) | Arguments passed to the shell on launch. Auto-derived from the shell name if you set `shell` but omit `shellArgs`. |
+| `shell` | `string` | `/bin/zsh` | Absolute path to the shell binary. If the path is missing or not executable, ClawTerm falls back to `/bin/zsh` and shows a toast. |
+| `shellArgs` | `string[]` | `["--login"]` (POSIX shells), `["-l"]` (nu/nushell) | Arguments passed to the shell on launch. Auto-derived from the shell name if you set `shell` but omit `shellArgs`. |
 
 ## Font
 
