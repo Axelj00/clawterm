@@ -40,7 +40,7 @@ fi
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
-[ "$OS" != "Darwin" ] && error "This script is for macOS. For Windows, use install.ps1; for Linux, download the .deb or .AppImage from GitHub Releases."
+[ "$OS" != "Darwin" ] && error "ClawTerm is macOS-only — this installer only runs on Darwin."
 case "$ARCH" in
   arm64|x86_64) ;;
   *) error "Unsupported architecture: $ARCH" ;;
