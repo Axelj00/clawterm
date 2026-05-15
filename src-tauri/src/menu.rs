@@ -23,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
-    AppHandle, Emitter, Manager, Runtime, State,
+    AppHandle, Emitter, Runtime, State,
 };
 
 #[derive(Default)]
@@ -235,20 +235,8 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
         }
         _ => {}
     }
-    // Route the event to the focused window only — broadcasting to all
-    // webviews would (e.g.) close a tab in every open Clawterm window
-    // when the user presses Cmd+W in just one. (#522)
-    let focused = app
-        .webview_windows()
-        .into_iter()
-        .find(|(_, w)| w.is_focused().unwrap_or(false))
-        .map(|(_, w)| w);
-    match focused {
-        Some(w) => {
-            let _ = w.emit("menu-action", id.to_string());
-        }
-        None => {
-            let _ = app.emit("menu-action", id.to_string());
-        }
-    }
+    // Broadcast to every window; the frontend's setupNativeMenu listener
+    // gates dispatch on the per-window `isWindowFocused` flag so only the
+    // focused window acts (#522).
+    let _ = app.emit("menu-action", id.to_string());
 }

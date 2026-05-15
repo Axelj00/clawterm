@@ -1128,10 +1128,7 @@ export class TerminalManager {
     try {
       const { listen } = await import("@tauri-apps/api/event");
       this.unlistenMenu = await listen<string>("menu-action", (e) => {
-        // Belt-and-suspenders: the Rust side routes menu-action to the
-        // focused window only, but if that detection fails (e.g. menu
-        // bar steals focus during dispatch) the event can broadcast.
-        // Each window ignores the event unless it's the focused one. (#522)
+        // macOS menu is process-level; ignore events not meant for us. (#522)
         if (!this.isWindowFocused) return;
         this.dispatchMenuAction(e.payload);
       });
@@ -1654,17 +1651,12 @@ export class TerminalManager {
           if (tab) tab.show();
         }
       } else {
-        // Last tab closes the window (Warp/iTerm/Wezterm convention).
-        // For the main window this quits the app, same as Cmd+Q. (#522)
-        // Use destroy() instead of close() — the onCloseRequested hook
-        // would re-enter dispose() while we're already mid-cleanup,
-        // leaving the window frozen but alive. We've already torn down
-        // the last tab; just kill the window directly.
-        this.renderTabList();
-        this.persistSession();
-        const w = getCurrentWindow();
-        logger.debug(`[closeTab] destroying window label=${w.label}`);
-        w.destroy().catch((err) => logger.warn("window.destroy() failed:", err));
+        // destroy() not close(): the onCloseRequested hook in main.ts
+        // re-enters dispose() and leaves the window frozen-but-alive if
+        // we go through close() while still inside our own teardown. (#522)
+        getCurrentWindow()
+          .destroy()
+          .catch((err) => logger.warn("window.destroy() failed:", err));
         return;
       }
     }
