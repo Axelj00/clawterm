@@ -11,8 +11,8 @@ const main = isMainWindow();
 
 // clear_sessions kills every PTY in the process, so only the main window
 // may run it on startup — otherwise a secondary window would nuke the
-// main window's PTYs. Updater and analytics are process-level singletons
-// for the same reason. (#522)
+// main window's PTYs. The updater is a process-level singleton for the
+// same reason. (#522)
 if (main) {
   invoke("plugin:pty|clear_sessions").catch((e) => console.debug("clear_sessions:", e));
 }
@@ -21,13 +21,6 @@ const manager = new TerminalManager();
 manager.init().then(() => {
   if (main) {
     startUpdateChecker(manager.config);
-
-    if (navigator.onLine) {
-      const pa = document.createElement("script");
-      pa.src = "https://plausible.io/js/pa-YbvLcN8JR7kX94JxIPUIL.js";
-      pa.async = true;
-      document.head.appendChild(pa);
-    }
   }
 });
 

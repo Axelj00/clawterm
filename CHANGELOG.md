@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Removed
+- **Plausible analytics** — purged from both the in-app shell and the landing page. The deferred script-injection in `src/main.ts`, the `<script>` block in `docs/index.html`, and the `https://plausible.io` allowances in the Tauri CSP are all gone. ClawTerm no longer makes any third-party analytics requests.
+
 ## [1.6.0] - 2026-05-15
 
 ### Changed
