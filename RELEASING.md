@@ -33,7 +33,7 @@ These must be configured at [Settings → Secrets → Actions](https://github.co
 | `TAURI_SIGNING_PRIVATE_KEY` | Signs update bundles so the in-app updater can verify integrity |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the signing key |
 
-Optional (for code signing — see issues #378, #379):
+Optional (for macOS code signing — see issue #378):
 
 | Secret | Purpose |
 |--------|---------|
@@ -43,8 +43,6 @@ Optional (for code signing — see issues #378, #379):
 | `APPLE_ID` | Apple ID email for notarization |
 | `APPLE_PASSWORD` | App-specific password for notarization |
 | `APPLE_TEAM_ID` | Apple Developer Team ID |
-| `WINDOWS_CERTIFICATE` | Base64-encoded .pfx certificate for Windows signing |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Password for the Windows certificate |
 
 ## What the release script does
 
@@ -77,26 +75,24 @@ After the tag is pushed, the [Release workflow](https://github.com/clawterm/claw
 2. Validates all three version files are in sync
 3. Runs frontend checks (lint, format, test, typecheck, build)
 
-### Build jobs (parallel matrix)
-Run on macOS, Windows, and Linux simultaneously:
+### Build job (macOS)
+ClawTerm is macOS-only. The release job runs on `macos-latest` and produces a single universal artifact:
 
-| Platform | Target | Artifacts |
-|----------|--------|-----------|
-| macOS | `universal-apple-darwin` (ARM + Intel) | `.dmg`, `.app.tar.gz`, `.app.tar.gz.sig` |
-| Windows | `x86_64-pc-windows-msvc` | `-setup.exe`, `-setup.exe.sig` |
-| Linux | `x86_64-unknown-linux-gnu` | `.deb`, `.deb.sig`, `.AppImage`, `.AppImage.sig` |
+| Target | Artifacts |
+|--------|-----------|
+| `universal-apple-darwin` (ARM + Intel) | `.dmg`, `.app.tar.gz`, `.app.tar.gz.sig` |
 
-Each build:
+The build:
 1. Compiles the Rust backend with `sccache` caching
 2. Builds the frontend bundle
 3. Produces signed Tauri bundles via `tauri-apps/tauri-action`
-4. Generates a `checksums-<target>.txt` with SHA-256 hashes of the published binaries
+4. Generates a `checksums-universal-apple-darwin.txt` with SHA-256 hashes of the published binaries
 5. Uploads everything to the draft GitHub Release
 6. Publishes `latest.json` — the update manifest that running instances poll
 
-The `publish` job then flips the draft to final once every platform succeeds.
+The `publish` job then flips the draft to final once the macOS build succeeds.
 
-**Build time**: ~10 minutes for macOS, ~8 minutes for Windows, ~6 minutes for Linux.
+**Build time**: ~10 minutes.
 
 ## How updates reach users
 
@@ -167,7 +163,7 @@ The Tauri updater cannot downgrade — users on the broken version must manually
 
 ### Prevention
 
-- Always test the built `.dmg`/`.nsis` locally before releasing (download from the GitHub Release)
+- Always test the built `.dmg` locally before releasing (download from the GitHub Release)
 - The preflight checks in the release script catch most issues, but can't catch platform-specific runtime bugs
 
 ## Manual release (emergency only)
