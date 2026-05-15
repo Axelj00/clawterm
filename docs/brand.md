@@ -83,14 +83,16 @@ Adding a new color? Add the token to `:root`, document semantic intent here, the
 
 ## Type
 
-- **UI:** `-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter Variable", "Inter", system-ui, sans-serif`
-- **Mono:** `"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace`
-- **Wordmark:** `"Inter", -apple-system, BlinkMacSystemFont, sans-serif`, `font-weight: 800`, `letter-spacing: -0.06em`
-- **Scale:** `--font-2xs` 8 · `--font-xs` 10 · `--font-sm` 11 · `--font-base` 12 · `--font-md` 13 · `--font-lg` 14 · `--font-2xl` 20
-- **Weights:** `--font-weight-medium` 510 · `--font-weight-semibold` 590 (tuned to Inter Variable; non-variable fallbacks coerce to 500/600)
-- **Letter-spacing:** `--letter-spacing-normal` (-0.01em) by default, `--letter-spacing-wide` (0.02em) for uppercase chrome (footer effort badges, status dots)
+ClawTerm is **all-mono**. Every glyph in the app — sidebar labels, buttons, dialog copy, headings, wordmark, terminal — is rendered in **JetBrains Mono**. The aesthetic is the technical voice of the brand: typewriter calm, archival precision, the typeface of well logs and field reports. There is no companion sans.
 
-Mono is only used inside the terminal and code snippets — never in the wordmark.
+- **UI / body / wordmark:** `"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace`
+- **Terminal:** same stack.
+- **Scale:** `--font-2xs` 8 · `--font-xs` 10 · `--font-sm` 11 · `--font-base` 12 · `--font-md` 13 · `--font-lg` 14 · `--font-2xl` 20
+- **Weights:** `--font-weight-medium` 500 · `--font-weight-semibold` 600 — JetBrains Mono Variable accepts the full 100–800 axis range, but UI surfaces should snap to 400 / 500 / 600 / 700 for predictability.
+- **Letter-spacing:** `--letter-spacing-normal` (0) by default — mono is already evenly spaced, no kerning compression. `--letter-spacing-wide` (0.04em) for uppercase chrome (footer effort badges, status dots).
+- **Wordmark:** JetBrains Mono, weight 700, letter-spacing 0. No tracking adjustments — the wordmark inherits mono's natural rhythm.
+
+Inter is retired. The dependency is removed from `package.json` and the `@font-face` block for Inter is dropped from `src/fonts.css`.
 
 ## Spacing
 

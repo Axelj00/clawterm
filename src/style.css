@@ -59,8 +59,12 @@
   accent-color: var(--accent);
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  --font-ui: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  /* All UI is JetBrains Mono — every glyph is monospaced from sidebar
+     labels to wordmark. The brand identity is "technical voice, typewriter
+     calm". The --font-ui / --font-mono split is preserved as a semantic
+     hint for future callers, but both resolve to the same stack today. */
+  --font-ui: "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
   --font-2xs: 8px;
   --font-xs: 10px;
   --font-sm: 11px;
@@ -68,10 +72,10 @@
   --font-md: 13px;
   --font-lg: 14px;
   --font-2xl: 20px;
-  --font-weight-medium: 510;
-  --font-weight-semibold: 590;
-  --letter-spacing-normal: -0.01em;
-  --letter-spacing-wide: 0.02em;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.04em;
 
   /* ── Layout ──────────────────────────────────────────────────────────── */
   --sidebar-width: 200px;
