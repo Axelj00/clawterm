@@ -1,8 +1,8 @@
 # Installation and updates
 
-ClawTerm ships pre-built binaries for macOS (Apple Silicon and Intel), Windows (x64), and Linux (x64, `.deb` and `.AppImage`).
+ClawTerm is **macOS-only** — universal builds for Apple Silicon and Intel.
 
-## macOS
+## Install
 
 One-liner installer (downloads the latest DMG, verifies the SHA-256 checksum against the release's `checksums-universal-apple-darwin.txt`, copies `ClawTerm.app` into `/Applications`, and clears the quarantine flag):
 
@@ -22,25 +22,6 @@ Mount the DMG and drag `ClawTerm.app` into `/Applications`.
 >
 > Tracking issue: [#378](https://github.com/clawterm/clawterm/issues/378).
 
-## Windows
-
-```powershell
-irm https://raw.githubusercontent.com/clawterm/clawterm/main/install.ps1 | iex
-```
-
-The script downloads the latest `ClawTerm_<version>_x64-setup.exe`, verifies the SHA-256 checksum, and runs the installer.
-
-You can also download the installer manually from the [latest release](https://github.com/clawterm/clawterm/releases/latest).
-
-> **SmartScreen note:** ClawTerm is not yet Authenticode-signed. Windows may show a SmartScreen warning the first time you run the installer. Click **More info → Run anyway**. Tracking issue: [#379](https://github.com/clawterm/clawterm/issues/379).
-
-## Linux
-
-Download either package from the [latest release](https://github.com/clawterm/clawterm/releases/latest):
-
-- Debian/Ubuntu → `ClawTerm_<version>_amd64.deb` — install with `sudo apt install ./ClawTerm_<version>_amd64.deb`
-- Other distros → `ClawTerm_<version>_amd64.AppImage` — `chmod +x` and run directly
-
 ### Building from source
 
 ```bash
@@ -54,32 +35,19 @@ Requirements:
 
 - [Rust](https://rustup.rs/)
 - [Node.js](https://nodejs.org/) 18+
-- Tauri system dependencies — see the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/) for your distro
+- Tauri system dependencies — see the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/)
 
 The built binary lands in `src-tauri/target/release/`.
 
 ## Verifying checksums manually
 
-Each platform's release artifacts ship with a `checksums-<target>.txt` file:
-
-- macOS → `checksums-universal-apple-darwin.txt`
-- Windows → `checksums-x86_64-pc-windows-msvc.txt`
-- Linux → `checksums-x86_64-unknown-linux-gnu.txt`
-
-**macOS / Linux:**
+The release ships a single checksums file, `checksums-universal-apple-darwin.txt`. Verify your DMG against it:
 
 ```bash
 shasum -a 256 -c checksums-universal-apple-darwin.txt --ignore-missing
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-Get-FileHash -Algorithm SHA256 .\ClawTerm_1.2.0_x64-setup.exe
-# Compare the hash against the matching line in checksums-x86_64-pc-windows-msvc.txt
-```
-
-The one-liner installers above do this automatically and abort on mismatch.
+The one-liner installer does this automatically and aborts on mismatch.
 
 ## Updates
 
@@ -105,26 +73,15 @@ If the installed version already matches the latest release, the script exits wi
 
 ## Uninstalling
 
-**macOS:**
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/clawterm/clawterm/main/install.sh | bash -s -- --uninstall
 ```
 
 This removes `/Applications/ClawTerm.app` and prompts before deleting `~/.config/clawterm` (so your config survives unless you say otherwise).
 
-**Windows:**
-
-```powershell
-irm https://raw.githubusercontent.com/clawterm/clawterm/main/install.ps1 | iex -ArgumentList '--uninstall'
-```
-
-Or uninstall from **Settings → Apps** like any other Windows app. The config at `%APPDATA%\clawterm` is left in place unless you remove it manually.
-
 **Manual cleanup paths:**
 
-| Platform | App | Config |
-| --- | --- | --- |
-| macOS | `/Applications/ClawTerm.app` | `~/.config/clawterm/` |
-| Windows | Uninstalled via Add/Remove Programs | `%APPDATA%\clawterm\` |
-| Linux | `/usr/bin/clawterm` (`.deb`) or wherever you placed the `.AppImage` | `~/.config/clawterm/` |
+| Item | Location |
+| --- | --- |
+| App bundle | `/Applications/ClawTerm.app` |
+| Config | `~/.config/clawterm/` |
