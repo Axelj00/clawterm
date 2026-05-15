@@ -131,6 +131,10 @@ export class TerminalManager {
   private sessionTimer: ReturnType<typeof setTimeout> | null = null;
   /** Main window owns session.json; secondaries are ephemeral (#522). */
   private isSecondaryWindow = false;
+  /** macOS menu state is process-level. Only the focused window may push
+   *  accelerators/disabled-set to avoid background windows clobbering
+   *  whatever the user's actually looking at. (#522) */
+  private isWindowFocused = true;
   private shortcutsPanel: { element: HTMLDivElement; destroy(): void } | null = null;
   /** Read-only keyboard-shortcuts overlay (#514). Stores the dismiss thunk
    *  so a second invocation of the menu toggles it off. */
@@ -633,6 +637,7 @@ export class TerminalManager {
     // (WebGL context loss or canvas blanking while the window was unfocused).
     win
       .onFocusChanged(({ payload: focused }) => {
+        this.isWindowFocused = focused;
         if (focused && this.activeTabId) {
           const tab = this.tabs.get(this.activeTabId);
           if (tab) {
@@ -644,6 +649,13 @@ export class TerminalManager {
           // Window came back to focus — wake the poll loop so the user
           // sees fresh state instead of waiting on the idle interval. (#456)
           this.wake();
+          // Refresh menu accelerators + disabled set so the process-level
+          // macOS menu reflects this window after a focus swap. (#522)
+          if (isMac) {
+            this.lastMenuDisabled = "";
+            this.applyMenuAccelerators();
+            this.updateMenuDisabled();
+          }
         }
       })
       .then((unlisten) => {
@@ -1128,6 +1140,7 @@ export class TerminalManager {
    *  item track whatever the user has set. */
   private applyMenuAccelerators() {
     if (!isMac) return;
+    if (!this.isWindowFocused) return;
     const accelerators = menuAcceleratorsForConfig(this.config);
     invoke("apply_menu_accelerators", { accelerators }).catch((err) => {
       logger.debug("apply_menu_accelerators failed:", err);
@@ -1140,6 +1153,7 @@ export class TerminalManager {
    *  the IPC before it crosses the bridge. */
   private updateMenuDisabled() {
     if (!isMac) return;
+    if (!this.isWindowFocused) return;
     const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
     const disabled: string[] = [];
     if (!tab) {
