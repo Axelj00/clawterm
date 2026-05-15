@@ -90,6 +90,11 @@ fn clear_session() -> Result<(), String> {
 /// Set up the Claude Code status line script and configure settings.json
 #[tauri::command]
 fn setup_claude_statusline() -> Result<(), String> {
+    // Drop any leftover <pid>.json files from previous Clawterm sessions
+    // whose Claude Code processes are gone. Without this, the directory
+    // grows monotonically over time. (#521)
+    process_info::sweep_stale_claude_status_files();
+
     // Use ~/.config/clawterm/ (no spaces in path) instead of platform config dir
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let dir = home.join(".config").join("clawterm");

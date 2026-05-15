@@ -7,10 +7,6 @@ use crate::project_info;
 /// Code's per-turn JSON. Shared with `setup_claude_statusline` in main.rs.
 pub const CLAUDE_STATUS_DIR: &str = "/tmp/clawterm-status";
 
-/// Files older than this are considered stale and ignored. The writer
-/// fires after every assistant turn, so anything fresh is recent.
-const CLAUDE_STATUS_STALE_SECS: u64 = 30;
-
 /// Result of a batched pane poll — CWD, git status, project name, and the
 /// Claude Code statusLine JSON in a single round-trip.
 #[derive(Serialize)]
@@ -112,21 +108,45 @@ async fn read_claude_status_async(pid: u32) -> Option<String> {
         .flatten()
 }
 
-/// Resolve the on-disk statusLine path for `pid` and verify it exists and
-/// isn't stale. Returns None on any failure. Used by both the async reader
-/// and tests.
+/// Resolve the on-disk statusLine path for `pid` and verify it exists.
+/// Returns None on any failure. Used by both the async reader and tests.
+///
+/// The writer fires only on Claude's assistant turns, so an mtime gate
+/// would hide the statusLine during normal idle reading. Gating on the
+/// keyed PID still being alive gives us the same "don't show data from
+/// dead claudes" guarantee without time-based flakiness. Pair this with
+/// `sweep_stale_claude_status_files` at startup to clean up PID-reuse
+/// edge cases.
 fn claude_status_path_if_fresh(pid: u32) -> Option<std::path::PathBuf> {
     let path = std::path::PathBuf::from(CLAUDE_STATUS_DIR).join(format!("{}.json", pid));
-    let metadata = std::fs::metadata(&path).ok()?;
-    let stale = metadata
-        .modified()
-        .ok()
-        .and_then(|m| m.elapsed().ok())
-        .is_some_and(|e| e.as_secs() > CLAUDE_STATUS_STALE_SECS);
-    if stale {
+    std::fs::metadata(&path).ok()?;
+    if !platform::pid_alive(pid) {
         return None;
     }
     Some(path)
+}
+
+/// Remove any `<pid>.json` files in `CLAUDE_STATUS_DIR` whose PID is no
+/// longer alive. Called once at startup from `setup_claude_statusline`
+/// — keeps the directory bounded across Clawterm sessions without
+/// relying on each Claude Code instance to clean up after itself.
+pub fn sweep_stale_claude_status_files() {
+    let dir = std::path::Path::new(CLAUDE_STATUS_DIR);
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Ok(pid) = stem.parse::<u32>() else {
+            continue;
+        };
+        if !platform::pid_alive(pid) {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
 }
 
 /// Convert a full CWD path to a display folder name.
@@ -217,6 +237,24 @@ mod platform {
 
             Ok(path)
         }
+    }
+
+    /// Cheap liveness check via `kill(pid, 0)`. Returns true iff the
+    /// kernel reports a process with this PID — even if we lack
+    /// permission to signal it (EPERM still means it exists). Used by
+    /// the statusLine read path to decide whether the on-disk file is
+    /// still owned by a live Claude Code session.
+    pub fn pid_alive(pid: u32) -> bool {
+        if pid == 0 {
+            return false;
+        }
+        let ret = unsafe { libc::kill(pid as libc::pid_t, 0) };
+        if ret == 0 {
+            return true;
+        }
+        // errno == EPERM means the process exists but we can't signal
+        // it. Anything else (ESRCH, etc.) means it doesn't.
+        std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
     }
 
     pub fn proc_name(pid: u32) -> Result<String, String> {
@@ -331,17 +369,72 @@ mod tests {
     }
 
     #[test]
-    fn test_claude_status_path_fresh_returns_path() {
+    fn test_claude_status_path_dead_pid_returns_none() {
+        // File exists, but the keyed PID is gone — gate must reject it
+        // (this is the orphan case the old mtime gate handled).
         let dir = std::path::PathBuf::from(CLAUDE_STATUS_DIR);
         if std::fs::create_dir_all(&dir).is_err() {
             return;
         }
-        // PID near u32::MAX so parallel test runs don't race on a real PID.
-        let pid: u32 = u32::MAX - 17;
+        let pid: u32 = u32::MAX - 19;
         let path = dir.join(format!("{}.json", pid));
-        let _ = std::fs::write(&path, r#"{"session_id":"s1"}"#);
+        let _ = std::fs::write(&path, r#"{"session_id":"orphan"}"#);
         let resolved = claude_status_path_if_fresh(pid);
         let _ = std::fs::remove_file(&path);
+        assert!(resolved.is_none(), "dead PID should be rejected");
+    }
+
+    #[test]
+    fn test_claude_status_path_live_pid_returns_path() {
+        let dir = std::path::PathBuf::from(CLAUDE_STATUS_DIR);
+        if std::fs::create_dir_all(&dir).is_err() {
+            return;
+        }
+        // Use our own PID — guaranteed alive — keyed at a path that
+        // won't collide with a real Claude Code session.
+        let pid = std::process::id();
+        let path = dir.join(format!("{}.json", pid));
+        let pre_existed = path.exists();
+        if !pre_existed {
+            let _ = std::fs::write(&path, r#"{"session_id":"s1"}"#);
+        }
+        let resolved = claude_status_path_if_fresh(pid);
+        if !pre_existed {
+            let _ = std::fs::remove_file(&path);
+        }
         assert_eq!(resolved.as_deref(), Some(path.as_path()));
+    }
+
+    #[test]
+    fn test_pid_alive_self() {
+        assert!(platform::pid_alive(std::process::id()));
+    }
+
+    #[test]
+    fn test_pid_alive_zero_is_false() {
+        assert!(!platform::pid_alive(0));
+    }
+
+    #[test]
+    fn test_pid_alive_huge_pid_is_false() {
+        assert!(!platform::pid_alive(u32::MAX - 1));
+    }
+
+    #[test]
+    fn test_sweep_removes_dead_pid_file() {
+        let dir = std::path::PathBuf::from(CLAUDE_STATUS_DIR);
+        if std::fs::create_dir_all(&dir).is_err() {
+            return;
+        }
+        let dead_pid: u32 = u32::MAX - 23;
+        let dead_path = dir.join(format!("{}.json", dead_pid));
+        let _ = std::fs::write(&dead_path, "{}");
+
+        sweep_stale_claude_status_files();
+
+        assert!(
+            !dead_path.exists(),
+            "sweep should remove file for dead PID"
+        );
     }
 }
