@@ -36,6 +36,7 @@ import { showCommandPalette, type PaletteCommand } from "./command-palette";
 import { createKeyHandler, type KeybindingActions } from "./keybinding-handler";
 import { TabRenderer } from "./tab-renderer";
 import { perfMetrics } from "./perf";
+import { openNewWindow } from "./window-manager";
 
 function el(tag: string, attrs?: Record<string, string>, ...children: (HTMLElement | string)[]): HTMLElement {
   const e = document.createElement(tag);
@@ -499,6 +500,11 @@ export class TerminalManager {
           }),
         ),
         projectBar,
+        el("button", {
+          id: "new-window-btn",
+          "aria-label": "New window",
+          title: "New window",
+        }),
       ),
       el(
         "div",
@@ -536,11 +542,13 @@ export class TerminalManager {
     const titlebar = document.getElementById("titlebar")!;
     titlebar.addEventListener("mousedown", (e) => {
       // Only drag from the titlebar itself, not control buttons
-      if ((e.target as HTMLElement).closest("#traffic-lights")) return;
+      const t = e.target as HTMLElement;
+      if (t.closest("#traffic-lights") || t.closest("#new-window-btn")) return;
       win.startDragging();
     });
     titlebar.addEventListener("dblclick", (e) => {
-      if ((e.target as HTMLElement).closest("#traffic-lights")) return;
+      const t = e.target as HTMLElement;
+      if (t.closest("#traffic-lights") || t.closest("#new-window-btn")) return;
       win.toggleMaximize();
     });
 
@@ -548,6 +556,12 @@ export class TerminalManager {
     newTabBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1.5V10.5M1.5 6H10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
     newTabBtn.addEventListener("click", () => {
       this.createTab();
+    });
+
+    const newWindowBtn = document.getElementById("new-window-btn")!;
+    newWindowBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1.5V10.5M1.5 6H10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    newWindowBtn.addEventListener("click", () => {
+      void openNewWindow();
     });
 
     const settingsBtn = document.getElementById("settings-btn")!;

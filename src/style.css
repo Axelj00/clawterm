@@ -496,6 +496,32 @@ body {
   padding-left: var(--space-4);
 }
 
+#new-window-btn {
+  margin-left: auto;
+  margin-right: var(--space-3);
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: var(--border-width) solid var(--border-subtle);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--transition-speed),
+    color var(--transition-speed),
+    border-color var(--transition-speed);
+  -webkit-app-region: no-drag;
+}
+
+#new-window-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
 /* Main content area below titlebar */
 #main-area {
   flex: 1;
