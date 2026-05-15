@@ -30,10 +30,13 @@
   --accent-border: rgba(124, 255, 79, 0.35);
   --accent-on: #050607;
 
-  /* Borders */
-  --border: #2a2e31;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-default: rgba(255, 255, 255, 0.12);
+  /* Borders — kept deliberately quiet (Mac-utility restraint, see
+     docs/brand.md). Solid --border for opaque separators; the rgba
+     pair below for subtle overlays where tinting matters more than
+     exact color. */
+  --border: #22262a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.09);
   --border-width: 1px;
 
   /* Status colors */

@@ -33,7 +33,7 @@ const _defaultShell = defaultShell();
  * Used by xterm.js for ANSI color rendering. Not user-configurable.
  */
 export const TERMINAL_THEME = {
-  background: "#0B0D0E",
+  background: "#07080A",
   foreground: "#F4F4F5",
   cursor: "#7CFF4F",
   cursorAccent: "#050607",
