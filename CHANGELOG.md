@@ -6,8 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-05-16
+
 ### Fixed
 - **Cmd+V no longer triggers the macOS pasteboard-consent UI** (the floating "Paste" pill on macOS 15+, or the "Allow Paste from [App]?" alert on 14). The Edit → Paste menu item used to register `Cmd+V` as an AppKit accelerator, which consumed the keystroke before WebKit saw it; the menu callback then read the clipboard via `navigator.clipboard.readText()`, a programmatic NSPasteboard read from JS that macOS gates behind the consent UI. The accelerator is gone — Cmd+V now flows to WebKit, which dispatches a real DOM `paste` event with `clipboardData` populated and the user-gesture context intact, and the existing pane paste listener handles it with no system prompt. The Edit menu still has a Paste item (clicking it manually goes through the old `readText` path and still surfaces the OS UI — rare path). Cut, Copy, and Select All keep their accelerators since they don't read the pasteboard (#531)
+
 
 ## [1.6.1] - 2026-05-15
 
@@ -1243,7 +1246,8 @@ This release establishes Clawterm's visual identity, transforming the app from a
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.6.2...HEAD
+[1.6.2]: https://github.com/clawterm/clawterm/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/clawterm/clawterm/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/clawterm/clawterm/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/clawterm/clawterm/compare/v1.4.3...v1.5.0
