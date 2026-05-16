@@ -217,6 +217,25 @@ fn validate_shell(path: String) -> Result<bool, String> {
     Ok(meta.is_file() && (meta.permissions().mode() & 0o111 != 0))
 }
 
+/// Bump the .app bundle directory's mtime so macOS IconServices re-reads
+/// `Contents/Resources/icon.icns` on the next Dock query. Called by the
+/// in-app updater just before relaunch — without it, the Dock keeps the
+/// pre-update icon cached even though the new bundle is on disk (#533).
+#[tauri::command]
+fn refresh_macos_bundle_icon_cache() -> Result<(), String> {
+    // current_exe() returns .../ClawTerm.app/Contents/MacOS/ClawTerm —
+    // walk up three levels to reach the .app bundle root.
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let bundle = exe
+        .parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.parent())
+        .ok_or("failed to resolve .app bundle path")?;
+    let f = fs::File::open(bundle).map_err(|e| e.to_string())?;
+    f.set_modified(std::time::SystemTime::now()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn main() {
     // Clean env vars that prevent tools from running inside our PTYs
     std::env::remove_var("CLAUDECODE");
@@ -267,6 +286,7 @@ fn main() {
             has_legacy_in_repo_worktrees,
             validate_shell,
             setup_claude_statusline,
+            refresh_macos_bundle_icon_cache,
             menu::apply_menu_accelerators,
             menu::apply_menu_disabled,
         ])

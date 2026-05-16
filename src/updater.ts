@@ -1,5 +1,6 @@
 import { check } from "@tauri-apps/plugin-updater";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
 import { logger } from "./logger";
 import { trapFocus } from "./utils";
 import { showToast } from "./toast";
@@ -130,6 +131,13 @@ async function installLatest(): Promise<void> {
       }
     });
     localStorage.setItem(JUST_UPDATED_KEY, String(Date.now()));
+    // Bump the .app bundle mtime so the macOS Dock re-reads the icon on
+    // relaunch. Otherwise IconServices keeps the pre-update icon cached
+    // even though the new bundle is on disk. Non-fatal if it fails —
+    // worst case is the old behavior (stale Dock icon). (#533)
+    await invoke("refresh_macos_bundle_icon_cache").catch((e) =>
+      logger.debug("Bundle icon cache refresh failed (non-fatal):", e),
+    );
     const { relaunch } = await import("@tauri-apps/plugin-process");
     await relaunch();
   } catch (e) {
