@@ -743,6 +743,10 @@ export class Pane {
   }
 
   private deferredFitTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the current deferral chain first started — used to enforce a
+   *  hard ceiling so a continuously-streaming pane can't defer its fit
+   *  forever (#532). */
+  private deferredFitFirstRequestedAt: number | null = null;
 
   fit() {
     if (this.element.offsetWidth === 0 || this.element.offsetHeight === 0) return;
@@ -753,10 +757,19 @@ export class Pane {
     // settles; the next write will naturally position the viewport.
     // Use 300ms grace (up from 150ms) to cover bursty agent output gaps
     // between streaming chunks and tool calls.
-    const outputAge = Date.now() - this.lastOutputAt;
-    if (outputAge < 300) {
-      // Always reschedule so the final fit() uses up-to-date dimensions
-      // and no resize operation is silently dropped.
+    //
+    // Hard ceiling: if output never settles (continuous streaming —
+    // multiple agents running, `yes`, tail -f, etc.) the deferral chain
+    // would extend indefinitely and the pane's xterm grid would stay
+    // stuck at the old column count after a resize. Cap total wait at
+    // 1000ms so a resize is always visible within ~1s, even if a brief
+    // scroll jump is the cost. (#532)
+    const now = Date.now();
+    const outputAge = now - this.lastOutputAt;
+    const firstRequestedAt = this.deferredFitFirstRequestedAt ?? now;
+    const totalWaited = now - firstRequestedAt;
+    if (outputAge < 300 && totalWaited < 1000) {
+      this.deferredFitFirstRequestedAt = firstRequestedAt;
       if (this.deferredFitTimer) clearTimeout(this.deferredFitTimer);
       this.deferredFitTimer = setTimeout(() => {
         this.deferredFitTimer = null;
@@ -765,6 +778,7 @@ export class Pane {
       return;
     }
 
+    this.deferredFitFirstRequestedAt = null;
     this.fitCore();
   }
 
@@ -781,6 +795,7 @@ export class Pane {
       clearTimeout(this.deferredFitTimer);
       this.deferredFitTimer = null;
     }
+    this.deferredFitFirstRequestedAt = null;
     this.fitCore();
   }
 
@@ -1243,6 +1258,7 @@ export class Pane {
       clearTimeout(this.deferredFitTimer);
       this.deferredFitTimer = null;
     }
+    this.deferredFitFirstRequestedAt = null;
     this.webgl?.dispose();
     this.webgl = null;
     if (this.writeRafId) {

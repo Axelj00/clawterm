@@ -118,6 +118,11 @@ export class TerminalManager {
   private tabRenderer!: TabRenderer;
   private resizeObserver: ResizeObserver | null = null;
   private resizeRaf = 0;
+  /** Settled-resize timer — fires ~150ms after the last ResizeObserver
+   *  tick to force-fit every pane in the active tab, so panes streaming
+   *  output don't stay stuck at the old column count after a window
+   *  resize gesture ends (#532). */
+  private resizeSettledTimer: ReturnType<typeof setTimeout> | null = null;
   /** rAF ID for coalesced render — multiple scheduleRender() calls within
    *  the same frame are batched into a single renderTabList(). */
   private renderRaf = 0;
@@ -2421,6 +2426,22 @@ export class TerminalManager {
           if (tab && !tab.transitioning) tab.fit();
         }
       });
+      // Settled hook: ~150ms after the last ResizeObserver tick, force-fit
+      // every pane in the active tab. The per-frame tab.fit() above honors
+      // the per-pane output-activity deferral (#177's scroll-jump guard),
+      // which means a pane streaming continuous output would otherwise be
+      // left at the old column count once the user stops dragging the
+      // window edge. forceFit bypasses the deferral so the settled state
+      // always reflects the final window size. (#532)
+      if (this.resizeSettledTimer) clearTimeout(this.resizeSettledTimer);
+      this.resizeSettledTimer = setTimeout(() => {
+        this.resizeSettledTimer = null;
+        if (this.quitting) return;
+        if (this.activeTabId) {
+          const tab = this.tabs.get(this.activeTabId);
+          if (tab && !tab.transitioning) tab.forceFit();
+        }
+      }, 150);
     });
     this.resizeObserver.observe(document.getElementById("terminal-container")!);
   }
@@ -2448,6 +2469,10 @@ export class TerminalManager {
     if (this.resizeRaf) {
       cancelAnimationFrame(this.resizeRaf);
       this.resizeRaf = 0;
+    }
+    if (this.resizeSettledTimer) {
+      clearTimeout(this.resizeSettledTimer);
+      this.resizeSettledTimer = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

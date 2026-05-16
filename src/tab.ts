@@ -1075,6 +1075,16 @@ export class Tab {
     }
   }
 
+  /** Force-fit every pane in this tab, bypassing the per-pane output-
+   *  activity deferral. Used by the window-resize "settled" hook so a
+   *  pane streaming output isn't left stuck at the old column count
+   *  after the resize gesture ends (#532). */
+  forceFit() {
+    if (this.element.classList.contains("active")) {
+      this.forceFitAllPanes();
+    }
+  }
+
   focus() {
     this.focusedPane.focus();
   }
