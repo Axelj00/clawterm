@@ -124,10 +124,10 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, ctx: &MenuContext) -> tauri::Resul
     // and the user-gesture context intact — the pane's paste listener
     // (`src/pane.ts`) handles it with no system prompt (#531).
     let edit_submenu = SubmenuBuilder::new(app, "Edit")
-        .item(&edit_item(app, "editCut", "Cut", "CmdOrCtrl+X", ctx)?)
-        .item(&edit_item(app, "editCopy", "Copy", "CmdOrCtrl+C", ctx)?)
-        .item(&edit_item_no_accel(app, "editPaste", "Paste", ctx)?)
-        .item(&edit_item(app, "editSelectAll", "Select All", "CmdOrCtrl+A", ctx)?)
+        .item(&edit_item(app, "editCut", "Cut", Some("CmdOrCtrl+X"), ctx)?)
+        .item(&edit_item(app, "editCopy", "Copy", Some("CmdOrCtrl+C"), ctx)?)
+        .item(&edit_item(app, "editPaste", "Paste", None, ctx)?)
+        .item(&edit_item(app, "editSelectAll", "Select All", Some("CmdOrCtrl+A"), ctx)?)
         .separator()
         .item(&item(app, "toggleSearch", "Find…", ctx)?)
         .build()?;
@@ -214,29 +214,22 @@ fn item<R: Runtime>(
     MenuItemBuilder::with_id(id, label).enabled(enabled).build(app)
 }
 
-/// Edit menu items use a fixed accelerator and never appear in
+/// Edit menu items use a fixed accelerator (or none — Paste passes `None`
+/// to keep Cmd+V flowing to WebKit, see #531) and never appear in
 /// config.keybindings; they still respect the enabled state.
 fn edit_item<R: Runtime>(
     app: &AppHandle<R>,
     id: &str,
     label: &str,
-    accel: &str,
+    accel: Option<&str>,
     ctx: &MenuContext,
 ) -> tauri::Result<MenuItem<R>> {
     let enabled = !ctx.disabled.contains(id);
-    MenuItemBuilder::with_id(id, label).accelerator(accel).enabled(enabled).build(app)
-}
-
-/// Edit menu item with no accelerator. Used for Paste so Cmd+V flows to
-/// WebKit instead of being consumed by AppKit (#531).
-fn edit_item_no_accel<R: Runtime>(
-    app: &AppHandle<R>,
-    id: &str,
-    label: &str,
-    ctx: &MenuContext,
-) -> tauri::Result<MenuItem<R>> {
-    let enabled = !ctx.disabled.contains(id);
-    MenuItemBuilder::with_id(id, label).enabled(enabled).build(app)
+    let mut builder = MenuItemBuilder::with_id(id, label).enabled(enabled);
+    if let Some(a) = accel {
+        builder = builder.accelerator(a);
+    }
+    builder.build(app)
 }
 
 /// Forward custom menu item clicks to the frontend. Predefined items
