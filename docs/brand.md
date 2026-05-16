@@ -83,6 +83,15 @@ Adding a new color? Add the token to `:root`, document semantic intent here, the
 
 **Forbidden uses:** large green backgrounds, decorative glow, marketing gradients, every icon, the full wordmark, hover states on secondary buttons, button emphasis on non-executing actions, "Save" buttons in settings (those are neutral).
 
+## Interaction
+
+**Button hover strategy is binary, never mixed (#537):**
+
+- **Filled accent surfaces** — `.btn--primary`, `.btn--destructive` — dim via `opacity`. The color is already loud; opacity softens without hue drift.
+- **Surface-tier buttons** — `.btn--secondary`, `.btn--ghost`, `.btn--icon` — lift their background via `--bg-hover` / `--bg-active` / `--bg-hover-strong`. No opacity drops on this tier; no background lifts on the filled-accent tier.
+
+If a new button needs a third strategy, the answer is to pick the closest existing tier, not to invent one. Tokens for the surface-tier lift ladder live in `:root` and have semantic names (`--bg-hover`, `--bg-active`, `--bg-hover-strong`) — never reach into another system's token (e.g. `--scrollbar-thumb`) as a shortcut.
+
 ## Type
 
 ClawTerm is **all-mono**. Every glyph in the app — sidebar labels, buttons, dialog copy, headings, wordmark, terminal — is rendered in **JetBrains Mono**. The aesthetic is the technical voice of the brand: typewriter calm, archival precision, the typeface of well logs and field reports. There is no companion sans.

@@ -8,6 +8,10 @@
   --bg-modal: rgba(11, 13, 14, 0.97);
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-active: rgba(255, 255, 255, 0.1);
+  /* Stronger interactive lift for filled-but-not-accent surfaces — e.g.
+     .btn--secondary on hover. Detached from --scrollbar-thumb so tweaks
+     to scrollbar appearance don't silently move button hovers (#537). */
+  --bg-hover-strong: rgba(255, 255, 255, 0.15);
 
   /* Text — translucent so it reads correctly over arbitrary surfaces. */
   --text-primary: rgba(244, 244, 245, 0.9);
@@ -163,7 +167,16 @@ textarea {
    Canonical button surface used by dialogs, the command palette, the
    update notice, and the settings panel. Per-surface classes keep their
    layout-specific tweaks (width, alignment) and additionally apply one
-   of the .btn--* modifiers below for color/border/hover behavior. */
+   of the .btn--* modifiers below for color/border/hover behavior.
+
+   Hover-strategy rule (#537, see docs/brand.md § Interaction):
+   - Filled accent surfaces (.btn--primary, .btn--destructive) dim via
+     opacity. The color is already loud; opacity softens without hue
+     drift.
+   - Surface-tier buttons (.btn--secondary, .btn--ghost, .btn--icon)
+     lift their background via --bg-hover / --bg-active / --bg-hover-
+     strong. No opacity drops on surface-tier; no background lifts on
+     filled-accent. Two mechanisms, never mixed. */
 .btn {
   font-family: inherit;
   font-size: var(--font-sm);
@@ -196,7 +209,7 @@ textarea {
   color: var(--text-primary);
 }
 .btn--secondary:hover:not(:disabled) {
-  background: var(--scrollbar-thumb);
+  background: var(--bg-hover-strong);
 }
 
 /* Bordered surface variant — used for non-destructive panel buttons
@@ -2044,7 +2057,9 @@ body {
 }
 .workspace-panel-add {
   background: none;
-  border: var(--border-width) solid var(--scrollbar-thumb);
+  /* Same token-leak pattern as .btn--secondary (#537) — was using
+     --scrollbar-thumb as a border color. Border tokens belong on borders. */
+  border: var(--border-width) solid var(--border-default);
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   width: var(--icon-lg);
