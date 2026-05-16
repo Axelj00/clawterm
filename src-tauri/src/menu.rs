@@ -112,10 +112,21 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, ctx: &MenuContext) -> tauri::Resul
     // Edit menu accelerators are standard macOS bindings and not driven by
     // config.keybindings — they're fixed strings that the dispatcher routes
     // to xterm or the focused text input (#497).
+    //
+    // Paste is the one exception: it has NO accelerator registered. If we
+    // register Cmd+V on the menu, AppKit consumes the keystroke before
+    // WebKit sees it, and the menu callback ends up reading the pasteboard
+    // via `navigator.clipboard.readText()` — a programmatic NSPasteboard
+    // read from JS, which triggers the macOS pasteboard-consent UI (the
+    // floating "Paste" pill on macOS 15+, or the "Allow Paste from [App]?"
+    // alert on 14). Without the accelerator, Cmd+V flows to WebKit, which
+    // dispatches a real DOM `paste` event with `clipboardData` populated
+    // and the user-gesture context intact — the pane's paste listener
+    // (`src/pane.ts`) handles it with no system prompt (#531).
     let edit_submenu = SubmenuBuilder::new(app, "Edit")
         .item(&edit_item(app, "editCut", "Cut", "CmdOrCtrl+X", ctx)?)
         .item(&edit_item(app, "editCopy", "Copy", "CmdOrCtrl+C", ctx)?)
-        .item(&edit_item(app, "editPaste", "Paste", "CmdOrCtrl+V", ctx)?)
+        .item(&edit_item_no_accel(app, "editPaste", "Paste", ctx)?)
         .item(&edit_item(app, "editSelectAll", "Select All", "CmdOrCtrl+A", ctx)?)
         .separator()
         .item(&item(app, "toggleSearch", "Find…", ctx)?)
@@ -214,6 +225,18 @@ fn edit_item<R: Runtime>(
 ) -> tauri::Result<MenuItem<R>> {
     let enabled = !ctx.disabled.contains(id);
     MenuItemBuilder::with_id(id, label).accelerator(accel).enabled(enabled).build(app)
+}
+
+/// Edit menu item with no accelerator. Used for Paste so Cmd+V flows to
+/// WebKit instead of being consumed by AppKit (#531).
+fn edit_item_no_accel<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    label: &str,
+    ctx: &MenuContext,
+) -> tauri::Result<MenuItem<R>> {
+    let enabled = !ctx.disabled.contains(id);
+    MenuItemBuilder::with_id(id, label).enabled(enabled).build(app)
 }
 
 /// Forward custom menu item clicks to the frontend. Predefined items
