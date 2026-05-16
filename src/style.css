@@ -2463,9 +2463,12 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Paste confirmation preview */
+/* Paste confirmation preview — sits inside the dialog as an inset code
+   surface, not an overlay; --overlay-backdrop is for the full-screen scrim
+   and stacked alpha over --bg-modal here crushes contrast on the preview
+   text (#534). --bg-base mirrors how .update-release-notes insets. */
 .paste-preview {
-  background: var(--overlay-backdrop);
+  background: var(--bg-base);
   border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: var(--space-4);
