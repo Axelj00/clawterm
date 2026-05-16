@@ -48,12 +48,8 @@
   accent-color: var(--accent);
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  /* --font-ui and --font-mono resolve to the same stack today — the split
-     is kept so future surfaces (e.g. a docs viewer) can adopt a sans
-     without touching every UI rule. */
-  --font-ui:
-    "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco,
-    Consolas, monospace;
+  /* One font stack for the whole app — brand is all-mono, no companion
+     sans (docs/brand.md § Type). Inter is retired (#535). */
   --font-mono:
     "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco,
     Consolas, monospace;
@@ -264,7 +260,7 @@ textarea {
   padding: var(--space-6);
   background: var(--bg-surface);
   color: var(--text-secondary);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   text-align: center;
 }
 .pane-error-title {
@@ -303,7 +299,7 @@ body {
   width: 100%;
   overflow: hidden;
   background: transparent;
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-feature-settings: "cv01", "ss03";
   letter-spacing: var(--letter-spacing-normal);
   -webkit-font-smoothing: antialiased;
@@ -354,7 +350,7 @@ body {
   background: var(--bg-surface);
   border: var(--border-width) solid var(--border-subtle);
   color: var(--text-tertiary);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: var(--font-sm);
   font-weight: var(--font-weight-medium);
   padding: var(--space-1) var(--space-3);
@@ -1150,7 +1146,7 @@ body {
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   color: var(--text-primary);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: var(--font-sm);
   margin-bottom: var(--space-4);
   outline: none;
@@ -2319,7 +2315,7 @@ body {
 
 /* Release notes — rendered markdown */
 .update-release-notes {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: var(--font-sm);
   color: var(--text-secondary);
   background: var(--bg-base);
