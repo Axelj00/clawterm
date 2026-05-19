@@ -109,24 +109,31 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, ctx: &MenuContext) -> tauri::Resul
         .item(&item(app, "closeActiveTab", "Close Tab", ctx)?)
         .build()?;
 
-    // Edit menu accelerators are standard macOS bindings and not driven by
-    // config.keybindings — they're fixed strings that the dispatcher routes
-    // to xterm or the focused text input (#497).
+    // Cut / Copy / Select All use custom IDs dispatched through the
+    // frontend (#497) — accelerators are fixed strings, not driven by
+    // config.keybindings.
     //
-    // Paste is the one exception: it has NO accelerator registered. If we
-    // register Cmd+V on the menu, AppKit consumes the keystroke before
-    // WebKit sees it, and the menu callback ends up reading the pasteboard
-    // via `navigator.clipboard.readText()` — a programmatic NSPasteboard
-    // read from JS, which triggers the macOS pasteboard-consent UI (the
-    // floating "Paste" pill on macOS 15+, or the "Allow Paste from [App]?"
-    // alert on 14). Without the accelerator, Cmd+V flows to WebKit, which
-    // dispatches a real DOM `paste` event with `clipboardData` populated
-    // and the user-gesture context intact — the pane's paste listener
-    // (`src/pane.ts`) handles it with no system prompt (#531).
+    // Paste is the special case: it uses `PredefinedMenuItem::paste`,
+    // which builds an NSMenuItem with `action: paste:` and the standard
+    // Cmd+V key equivalent. That seeds the AppKit responder chain
+    // WKWebView needs — Cmd+V then routes through WebKit's native paste
+    // (NSText reading NSPasteboard), which dispatches a real DOM `paste`
+    // event with `clipboardData` populated. Crucially, the native paste
+    // path does NOT trip the macOS pasteboard-consent UI (the floating
+    // "Paste" pill on 15+, or the "Allow Paste from [App]?" alert on
+    // 14) — that UI is only triggered by programmatic JS pasteboard
+    // reads like `navigator.clipboard.readText()`. The pane's existing
+    // DOM `paste` listener (`src/pane.ts`) handles agent-trust gating
+    // and image-paste-to-Ctrl+V (#508, #519, #520, #546).
+    //
+    // #531 dropped the accelerator from a custom MenuItemBuilder hoping
+    // Cmd+V would "fall through to WebKit" — it doesn't, because a
+    // custom-action menu item never registers `paste:` on the responder
+    // chain. The predefined item is the only thing that does (#546).
     let edit_submenu = SubmenuBuilder::new(app, "Edit")
         .item(&edit_item(app, "editCut", "Cut", Some("CmdOrCtrl+X"), ctx)?)
         .item(&edit_item(app, "editCopy", "Copy", Some("CmdOrCtrl+C"), ctx)?)
-        .item(&edit_item(app, "editPaste", "Paste", None, ctx)?)
+        .item(&PredefinedMenuItem::paste(app, Some("Paste"))?)
         .item(&edit_item(app, "editSelectAll", "Select All", Some("CmdOrCtrl+A"), ctx)?)
         .separator()
         .item(&item(app, "toggleSearch", "Find…", ctx)?)
@@ -214,9 +221,10 @@ fn item<R: Runtime>(
     MenuItemBuilder::with_id(id, label).enabled(enabled).build(app)
 }
 
-/// Edit menu items use a fixed accelerator (or none — Paste passes `None`
-/// to keep Cmd+V flowing to WebKit, see #531) and never appear in
-/// config.keybindings; they still respect the enabled state.
+/// Edit menu items use a fixed accelerator and never appear in
+/// config.keybindings; they still respect the enabled state. Paste
+/// uses `PredefinedMenuItem::paste` instead — see the comment block in
+/// `build_menu` (#546).
 fn edit_item<R: Runtime>(
     app: &AppHandle<R>,
     id: &str,
