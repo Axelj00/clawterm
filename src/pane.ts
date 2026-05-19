@@ -1029,15 +1029,6 @@ export class Pane {
     }
   }
 
-  /** Public wrapper around the trust gate so the right-click paste
-   *  dispatcher can decide whether to forward a Ctrl+V image-paste
-   *  keystroke to the TUI (Claude Code reads the clipboard itself via
-   *  osascript on Ctrl+V, see #520). Returns false on any lookup
-   *  failure so callers fall back to the text-paste path. */
-  async isTrustedAgentForeground(): Promise<boolean> {
-    return this.foregroundIsTrustedAgent();
-  }
-
   /** Image clipboard branch of the DOM paste listener (#520, #546).
    *  Trusted-agent foreground gets a Ctrl+V passed to the pty so the
    *  agent can pull the image from NSPasteboard itself. Anything else

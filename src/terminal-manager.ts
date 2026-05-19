@@ -1,5 +1,4 @@
 import { Tab } from "./tab";
-import type { Pane } from "./pane";
 import { loadConfig, applyConfigToCSS, type Config } from "./config";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
@@ -1176,9 +1175,10 @@ export class TerminalManager {
         "toggleSearch",
         "editCut",
         "editCopy",
-        "editPaste",
         "editSelectAll",
       );
+      // Paste is a PredefinedMenuItem since #546 — AppKit manages its
+      // enabled state via the responder chain, so it's not in this set.
     } else if (tab.paneCount <= 1) {
       disabled.push("closeActivePane");
     }
@@ -1220,7 +1220,6 @@ export class TerminalManager {
         return;
       case "editCopy":
       case "editCut":
-      case "editPaste":
       case "editSelectAll":
         this.dispatchEditAction(id);
         return;
@@ -1229,19 +1228,16 @@ export class TerminalManager {
     }
   }
 
-  /** Edit menu. When a text input has focus (settings, search bar, command
-   *  palette), use the browser's native edit semantics. Otherwise route to
-   *  the focused pane's xterm. */
+  /** Edit menu Cut / Copy / Select All. When a text input has focus
+   *  (settings, search bar, command palette), use the browser's native
+   *  edit semantics. Otherwise route to the focused pane's xterm.
+   *  Paste is not handled here — it routes through AppKit's native
+   *  paste: action (PredefinedMenuItem::paste, see #546). */
   private dispatchEditAction(id: string): void {
     if (isTextInputFocused()) {
       const el = document.activeElement;
       if (id === "editSelectAll" && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
         el.select();
-      } else if (id === "editPaste") {
-        navigator.clipboard.readText().then(
-          (text) => document.execCommand("insertText", false, text),
-          (e) => logger.debug("Clipboard read failed:", e),
-        );
       } else if (id === "editCopy" || id === "editCut") {
         document.execCommand(id === "editCut" ? "cut" : "copy");
       }
@@ -1251,40 +1247,10 @@ export class TerminalManager {
     if (!pane) return;
     if (id === "editSelectAll") {
       pane.selectAll();
-    } else if (id === "editPaste") {
-      void this.dispatchPaste(pane);
     } else {
       // editCopy / editCut — terminal has no cut concept; both copy the selection.
       const sel = pane.getSelection();
       if (sel) copyToClipboard(sel);
-    }
-  }
-
-  /** Paste pipeline for Cmd+V from the Edit menu. When the clipboard
-   *  holds an image and the pane's foreground is a trusted AI agent,
-   *  send Ctrl+V (\x16) to the pty so the agent can pull the image
-   *  from NSPasteboard itself (Claude Code shells out to osascript on
-   *  Ctrl+V — verified in the binary; see #520). For anything else
-   *  fall back to the normal text-paste path. */
-  private async dispatchPaste(pane: Pane): Promise<void> {
-    try {
-      const items = await navigator.clipboard.read();
-      const hasImage = items.some((item) => item.types.some((t) => t.startsWith("image/")));
-      if (hasImage && (await pane.isTrustedAgentForeground())) {
-        pane.writeToPty("\x16");
-        return;
-      }
-    } catch (e) {
-      // clipboard.read() can reject on permission / unsupported types —
-      // not an error condition, just fall through to text paste.
-      logger.debug("Clipboard image-check failed, falling back to text:", e);
-    }
-    try {
-      const text = await navigator.clipboard.readText();
-      pane.requestPaste(text);
-    } catch (e) {
-      logger.debug("Clipboard read failed:", e);
-      showToast("Failed to read clipboard", "error");
     }
   }
 
