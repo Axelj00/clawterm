@@ -58,11 +58,13 @@ export class NotificationManager {
 
   /** Re-check OS notification permission. Call this when the window regains
    *  focus — the user may have granted permission externally in System
-   *  Settings between sessions of using the app. (#550) */
+   *  Settings between sessions of using the app. Short-circuits when
+   *  permission is already granted to avoid IPC on every alt-tab. (#550) */
   async recheckPermission() {
+    if (this.permissionGranted) return;
     try {
       const granted = await isPermissionGranted();
-      if (granted && !this.permissionGranted) {
+      if (granted) {
         logger.debug("Notification permission was granted externally");
         this.surfacedDenial = false;
       }
@@ -91,7 +93,6 @@ export class NotificationManager {
       return;
     }
 
-    // Per-tab cooldown: drop banner if we just fired one for this tab.
     // Same-tab Web Notifications with `tag: tabId` already replace each
     // other at the OS level, so without throttling, a looping agent burns
     // through notification-center retention with redundant replacements

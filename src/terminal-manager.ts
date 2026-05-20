@@ -776,16 +776,7 @@ export class TerminalManager {
       this.scheduleRender();
     };
 
-    tab.onOscNotification = (text, pane) => {
-      // OSC 9;2 is the single notification surface (#547). Suppress only
-      // when the user is actually looking at the pane that fired the OSC
-      // — tab-level equality is too coarse for split panes where each
-      // pane runs a different agent (#549). Sidebar dot is handled
-      // separately in Tab.handleOscNotification.
-      if (tab.muted) return;
-      const userIsLookingAtThisPane =
-        this.activeTabId === tab.id && tab.getFocusedPane() === pane && !document.hidden;
-      if (userIsLookingAtThisPane) return;
+    tab.onOscNotification = (text) => {
       this.notifications.notifyAgentAttention(text, tab.title, tab.id);
     };
 
@@ -832,6 +823,7 @@ export class TerminalManager {
       // PTY failed to spawn — clean up and remove the tab
       logger.warn(`Tab ${id}: PTY failed to start, removing tab`);
       tab.dispose();
+      this.notifications.clearTab(id);
       this.tabs.delete(id);
       this.renderTabList();
       return;
@@ -1712,6 +1704,7 @@ export class TerminalManager {
       const tab = this.tabs.get(tabId);
       if (tab) {
         this.serverTracker.removeServer(tabId);
+        this.notifications.clearTab(tabId);
         try {
           tab.dispose();
         } catch {

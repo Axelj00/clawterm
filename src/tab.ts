@@ -93,13 +93,10 @@ export class Tab {
 
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
-  /** Fires on every OSC 9;2 attention request from a pane, with the raw
-   *  message text and the originating pane. The pane is forwarded so the
-   *  subscriber can check focused-pane equality — suppressing only when
-   *  the user is actually looking at *this* pane, not just this tab.
-   *  Critical for split-pane tabs where each pane runs a different agent.
-   *  (#547, #549) */
-  onOscNotification: ((text: string, pane: Pane) => void) | null = null;
+  /** Fires when an OSC 9;2 attention request should produce a system
+   *  banner — already filtered for mute, focused-pane, and window
+   *  visibility. Subscribers just route to the notification surface. */
+  onOscNotification: ((text: string) => void) | null = null;
   onOutputEvent: ((event: OutputEvent) => void) | null = null;
   /** Fires on PTY activity for any pane in this tab — forwarded to the
    *  central poll loop's wake() so adaptive idle mode can break out
@@ -190,13 +187,12 @@ export class Tab {
     this.onOutputEvent?.(event);
   }
 
-  /** Handle OSC 9;2 notification — the agent explicitly wants attention.
-   *  Two surfaces fire from here: the sidebar attention dot (for hidden,
-   *  unmuted background tabs) and the OSC payload forwarded to whoever
-   *  subscribed (NotificationManager → system banner). Mute is honored
-   *  once at the top so it silences both surfaces. The originating pane
-   *  is forwarded so the subscriber can suppress only when the user is
-   *  actually looking at *that pane* (#547, #549). */
+  /** Handle OSC 9;2 — the agent wants attention. Mute silences both
+   *  surfaces. The sidebar dot fires when the tab is fully backgrounded;
+   *  the banner is suppressed only when the user is actively looking at
+   *  *this specific pane* (visible tab, focused pane, document visible).
+   *  Split-pane tabs need pane-level granularity — a hidden pane in a
+   *  visible tab still warrants a banner. (#547, #549) */
   private handleOscNotification(pane: Pane, text: string) {
     if (this.muted) return;
     const showGrace = Date.now() - this.lastShownAt < 3000;
@@ -204,7 +200,11 @@ export class Tab {
       this.state.needsAttention = true;
       this.onStateChange?.();
     }
-    this.onOscNotification?.(text, pane);
+    const userIsLookingAtThisPane =
+      this.isVisible && pane === this.focusedPane && !document.hidden;
+    if (!userIsLookingAtThisPane) {
+      this.onOscNotification?.(text);
+    }
   }
 
   private updateTitle() {
