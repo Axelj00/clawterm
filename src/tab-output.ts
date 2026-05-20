@@ -14,7 +14,6 @@ export interface OutputEventContext {
    *  from events that fire during the show() rAF pipeline (#278) */
   recentlyShown: boolean;
   updateTitle(): void;
-  onNeedsAttention?(): void;
 }
 
 /**

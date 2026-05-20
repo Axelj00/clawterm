@@ -772,10 +772,6 @@ export class TerminalManager {
       this.scheduleRender();
     };
 
-    tab.onNeedsAttention = () => {
-      this.scheduleRender();
-    };
-
     tab.onOscNotification = (text) => {
       // OSC 9;2 is the single notification surface (#547). Suppress for
       // muted tabs and for the active tab (user is already looking at it).
