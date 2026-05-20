@@ -94,9 +94,12 @@ export class Tab {
   onExit: (() => void) | null = null;
   onTitleChange: ((title: string) => void) | null = null;
   /** Fires on every OSC 9;2 attention request from a pane, with the raw
-   *  message text. Forwarded to NotificationManager so the user sees a
-   *  system notification carrying the agent's message (#547). */
-  onOscNotification: ((text: string) => void) | null = null;
+   *  message text and the originating pane. The pane is forwarded so the
+   *  subscriber can check focused-pane equality — suppressing only when
+   *  the user is actually looking at *this* pane, not just this tab.
+   *  Critical for split-pane tabs where each pane runs a different agent.
+   *  (#547, #549) */
+  onOscNotification: ((text: string, pane: Pane) => void) | null = null;
   onOutputEvent: ((event: OutputEvent) => void) | null = null;
   /** Fires on PTY activity for any pane in this tab — forwarded to the
    *  central poll loop's wake() so adaptive idle mode can break out
@@ -191,15 +194,17 @@ export class Tab {
    *  Two surfaces fire from here: the sidebar attention dot (for hidden,
    *  unmuted background tabs) and the OSC payload forwarded to whoever
    *  subscribed (NotificationManager → system banner). Mute is honored
-   *  once at the top so it silences both surfaces (#547). */
-  private handleOscNotification(_pane: Pane, text: string) {
+   *  once at the top so it silences both surfaces. The originating pane
+   *  is forwarded so the subscriber can suppress only when the user is
+   *  actually looking at *that pane* (#547, #549). */
+  private handleOscNotification(pane: Pane, text: string) {
     if (this.muted) return;
     const showGrace = Date.now() - this.lastShownAt < 3000;
     if (!this.isVisible && !this.transitioning && !showGrace) {
       this.state.needsAttention = true;
       this.onStateChange?.();
     }
-    this.onOscNotification?.(text);
+    this.onOscNotification?.(text, pane);
   }
 
   private updateTitle() {

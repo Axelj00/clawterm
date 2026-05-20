@@ -772,12 +772,16 @@ export class TerminalManager {
       this.scheduleRender();
     };
 
-    tab.onOscNotification = (text) => {
-      // OSC 9;2 is the single notification surface (#547). Suppress for
-      // muted tabs and for the active tab (user is already looking at it).
-      // The sidebar attention dot is handled separately in Tab.handleOscNotification.
+    tab.onOscNotification = (text, pane) => {
+      // OSC 9;2 is the single notification surface (#547). Suppress only
+      // when the user is actually looking at the pane that fired the OSC
+      // — tab-level equality is too coarse for split panes where each
+      // pane runs a different agent (#549). Sidebar dot is handled
+      // separately in Tab.handleOscNotification.
       if (tab.muted) return;
-      if (this.activeTabId === tab.id && !document.hidden) return;
+      const userIsLookingAtThisPane =
+        this.activeTabId === tab.id && tab.getFocusedPane() === pane && !document.hidden;
+      if (userIsLookingAtThisPane) return;
       this.notifications.notifyAgentAttention(text, tab.title, tab.id);
     };
 
