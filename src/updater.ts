@@ -6,19 +6,33 @@ import { trapFocus } from "./utils";
 import { showToast } from "./toast";
 import type { Config } from "./config";
 
+type Update = NonNullable<Awaited<ReturnType<typeof check>>>;
+type UpdateMode = Config["updates"]["mode"];
+
+/** UI/lifecycle state of the in-flight update.
+ *   idle        — no update detected
+ *   available   — detected; bundle not yet downloaded
+ *   downloading — download() in flight
+ *   staged      — bundle on disk; install() not yet called
+ *   installing  — install() in flight (during click-install or during quit)
+ *   failed      — terminal error; user can retry via the manual-download link */
+type UpdateState = "idle" | "available" | "downloading" | "staged" | "installing" | "failed";
+
 const JUST_UPDATED_KEY = "clawterm_last_update_ts";
 const RELEASES_URL = "https://github.com/clawterm/clawterm/releases/latest";
-let updateFound = false;
+const CHECK_FAILURE_THRESHOLD = 3;
+/** Hard cap on the install() call during onCloseRequested so a hung Tauri
+ *  install can't keep the window alive forever. */
+const QUIT_INSTALL_TIMEOUT_MS = 30_000;
+
 let manualCheckInProgress = false;
 let consecutiveCheckFailures = 0;
-const CHECK_FAILURE_THRESHOLD = 3;
-let autoInstallEnabled = false;
-/** The pending update object from the last check — reused by installLatest
- *  to avoid a redundant network round-trip before downloading. */
-let pendingUpdate: Awaited<ReturnType<typeof check>> = null;
+let updateMode: UpdateMode = "download";
+let updateState: UpdateState = "idle";
+let pendingUpdate: Update | null = null;
 
 export function startUpdateChecker(config: Config): void {
-  autoInstallEnabled = config.updates.mode === "auto";
+  updateMode = config.updates.mode;
   if (!config.updates.autoCheck) {
     logger.debug("Auto-update checking disabled via config");
     return;
@@ -39,10 +53,11 @@ export function startUpdateChecker(config: Config): void {
     setTimeout(checkForUpdates, 3000);
   }
 
-  // Then check periodically
+  // Then check periodically — skip while we already have something pending,
+  // staged, or in flight, so a new check can't clobber an in-progress flow.
   const intervalMs = config.updates.checkIntervalMs;
   setInterval(() => {
-    if (!updateFound) checkForUpdates();
+    if (updateState === "idle" || updateState === "failed") checkForUpdates();
   }, intervalMs);
 }
 
@@ -62,10 +77,7 @@ export async function manualCheckForUpdates(): Promise<void> {
         }, 2000);
       }
     } else {
-      updateFound = true;
-      pendingUpdate = update;
-      logger.debug(`Update available: ${update.version}`);
-      showUpdateNotice(update.version, update.body ?? "", () => installLatest());
+      handleDetected(update);
     }
   } catch (e) {
     logger.warn("Manual update check failed:", e);
@@ -80,16 +92,7 @@ async function checkForUpdates(): Promise<void> {
     const update = await check();
     consecutiveCheckFailures = 0;
     if (!update) return;
-
-    updateFound = true;
-    pendingUpdate = update;
-    logger.debug(`Update available: ${update.version}`);
-    if (autoInstallEnabled) {
-      showToast(`Updating to v${update.version}\u2026`, "info");
-      installLatest();
-    } else {
-      showUpdateNotice(update.version, update.body ?? "", () => installLatest());
-    }
+    handleDetected(update);
   } catch (e) {
     consecutiveCheckFailures++;
     if (consecutiveCheckFailures >= CHECK_FAILURE_THRESHOLD) {
@@ -103,33 +106,95 @@ async function checkForUpdates(): Promise<void> {
   }
 }
 
-/**
- * Download and install the pending update. Uses the cached update object
- * from the last check() call to avoid a redundant network round-trip.
- */
-async function installLatest(): Promise<void> {
+/** Update detected — dispatch by mode. */
+function handleDetected(update: Update): void {
+  pendingUpdate = update;
+  setState("available");
+  logger.debug(`Update available: ${update.version}`);
+
+  if (updateMode === "auto") {
+    showToast(`Updating to v${update.version}…`, "info");
+    showUpdateNotice(update.version, update.body ?? "");
+    installPending({ relaunchAfter: true });
+  } else if (updateMode === "download") {
+    showUpdateNotice(update.version, update.body ?? "");
+    // Silent background download — the notice will switch to "Install Now"
+    // when it lands; failures fall back to the manual-download link.
+    downloadPending().catch(() => {});
+  } else {
+    // "manual" — show the notice; user must click Download.
+    showUpdateNotice(update.version, update.body ?? "");
+  }
+}
+
+/** Fetch the bundle without installing. Used by mode=download on detection
+ *  and by mode=manual after the user clicks Download. */
+async function downloadPending(): Promise<void> {
+  const latest = pendingUpdate;
+  if (!latest) return;
+  if (updateState !== "available") return;
+  setState("downloading");
   try {
-    const latest = pendingUpdate;
-    if (!latest) {
-      logger.debug("No pending update to install");
-      return;
-    }
-    logger.debug(`Installing version: ${latest.version}`);
     let totalBytes = 0;
     let downloadedBytes = 0;
-    await latest.downloadAndInstall((event) => {
+    await latest.download((event) => {
       if (event.event === "Started") {
         totalBytes = event.data.contentLength ?? 0;
         downloadedBytes = 0;
-        updateNoticeProgress("Downloading\u2026");
+        updateNoticeProgress("Downloading…");
       } else if (event.event === "Progress") {
         downloadedBytes += event.data.chunkLength;
         const pct = totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : 0;
-        updateNoticeProgress(totalBytes ? `Downloading\u2026 ${pct}%` : "Downloading\u2026");
-      } else if (event.event === "Finished") {
-        updateNoticeProgress("Installing\u2026");
+        updateNoticeProgress(totalBytes ? `Downloading… ${pct}%` : "Downloading…");
       }
     });
+    setState("staged");
+    renderNoticeForState();
+  } catch (e) {
+    logger.warn("Update download failed:", e);
+    setState("failed");
+    resetUpdateNotice();
+    showToast("Update download failed — opening download page…", "error");
+    try {
+      await openUrl(RELEASES_URL);
+    } catch {
+      showToast(`Download manually: ${RELEASES_URL}`, "error");
+    }
+  }
+}
+
+/** Install a downloaded (or downloads-then-installs) bundle. `relaunchAfter`
+ *  controls whether to immediately relaunch — false during the quit hook,
+ *  since the user is already on their way out. */
+async function installPending({ relaunchAfter }: { relaunchAfter: boolean }): Promise<void> {
+  const latest = pendingUpdate;
+  if (!latest) {
+    logger.debug("No pending update to install");
+    return;
+  }
+  setState("installing");
+  updateNoticeProgress("Installing…");
+  try {
+    if (updateMode === "auto") {
+      // Auto path: combined download+install (current behavior, preserved).
+      let totalBytes = 0;
+      let downloadedBytes = 0;
+      await latest.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          totalBytes = event.data.contentLength ?? 0;
+          downloadedBytes = 0;
+          updateNoticeProgress("Downloading…");
+        } else if (event.event === "Progress") {
+          downloadedBytes += event.data.chunkLength;
+          const pct = totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : 0;
+          updateNoticeProgress(totalBytes ? `Downloading… ${pct}%` : "Downloading…");
+        } else if (event.event === "Finished") {
+          updateNoticeProgress("Installing…");
+        }
+      });
+    } else {
+      await latest.install();
+    }
     localStorage.setItem(JUST_UPDATED_KEY, String(Date.now()));
     // Bump the .app bundle mtime so the macOS Dock re-reads the icon on
     // relaunch. Otherwise IconServices keeps the pre-update icon cached
@@ -138,23 +203,56 @@ async function installLatest(): Promise<void> {
     await invoke("refresh_macos_bundle_icon_cache").catch((e) =>
       logger.debug("Bundle icon cache refresh failed (non-fatal):", e),
     );
-    const { relaunch } = await import("@tauri-apps/plugin-process");
-    await relaunch();
+    if (relaunchAfter) {
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    }
   } catch (e) {
     logger.warn("Update install failed:", e);
     localStorage.removeItem(JUST_UPDATED_KEY);
-    // Allow re-detection so the update notice can reappear
-    updateFound = false;
+    setState("failed");
     pendingUpdate = null;
-    // Reset the notice UI so the button becomes usable again
     resetUpdateNotice();
-    showToast("Update failed — opening download page…", "error");
-    try {
-      await openUrl(RELEASES_URL);
-    } catch {
-      showToast(`Download manually: ${RELEASES_URL}`, "error");
+    if (relaunchAfter) {
+      showToast("Update failed — opening download page…", "error");
+      try {
+        await openUrl(RELEASES_URL);
+      } catch {
+        showToast(`Download manually: ${RELEASES_URL}`, "error");
+      }
     }
+    throw e;
   }
+}
+
+/** True if a downloaded bundle is sitting on disk waiting to be applied. */
+export function hasStagedUpdate(): boolean {
+  return updateState === "staged";
+}
+
+/** Apply a staged update during window close. Returns when install resolves
+ *  or the timeout fires — never rejects so the quit path is always unblocked.
+ *  Called from main.ts's onCloseRequested hook in the main window. */
+export async function installStagedOnQuit(): Promise<void> {
+  if (!hasStagedUpdate()) return;
+  logger.debug("[updater] installing staged update during quit");
+  try {
+    await Promise.race([
+      installPending({ relaunchAfter: false }),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("install timeout")), QUIT_INSTALL_TIMEOUT_MS),
+      ),
+    ]);
+    logger.debug("[updater] staged install complete — next launch is on the new version");
+  } catch (e) {
+    logger.warn("[updater] staged install failed during quit (proceeding with quit anyway):", e);
+  }
+}
+
+function setState(next: UpdateState): void {
+  if (updateState === next) return;
+  logger.debug(`[updater] state: ${updateState} -> ${next}`);
+  updateState = next;
 }
 
 /**
@@ -239,11 +337,12 @@ function showUpdateConfirm(version: string, releaseNotes: string, onConfirm: () 
 
   const titleEl = document.createElement("div");
   titleEl.className = "update-dialog-title";
-  titleEl.textContent = `Update to ${version}`;
+  titleEl.textContent = `Install ${version}`;
 
   const bodyEl = document.createElement("div");
   bodyEl.className = "update-dialog-body";
-  bodyEl.textContent = "This will close all terminals and restart the app.";
+  bodyEl.textContent =
+    "Installing now closes all terminals immediately. The update is already downloaded — it will apply automatically when you next quit ClawTerm, no action needed.";
 
   dialog.appendChild(titleEl);
 
@@ -260,15 +359,15 @@ function showUpdateConfirm(version: string, releaseNotes: string, onConfirm: () 
   const actionsEl = document.createElement("div");
   actionsEl.className = "update-dialog-actions";
 
-  const cancelBtn = document.createElement("button");
-  cancelBtn.className = "btn btn--secondary update-dialog-btn";
-  cancelBtn.textContent = "Cancel";
+  const laterBtn = document.createElement("button");
+  laterBtn.className = "btn btn--secondary update-dialog-btn";
+  laterBtn.textContent = "Install on Next Quit";
 
   const confirmBtn = document.createElement("button");
   confirmBtn.className = "btn btn--primary update-dialog-btn";
-  confirmBtn.textContent = "Update & Restart";
+  confirmBtn.textContent = "Install & Restart";
 
-  actionsEl.appendChild(cancelBtn);
+  actionsEl.appendChild(laterBtn);
   actionsEl.appendChild(confirmBtn);
   dialog.appendChild(actionsEl);
   overlay.appendChild(dialog);
@@ -280,7 +379,7 @@ function showUpdateConfirm(version: string, releaseNotes: string, onConfirm: () 
     overlay.remove();
   };
 
-  cancelBtn.addEventListener("click", dismiss);
+  laterBtn.addEventListener("click", dismiss);
   confirmBtn.addEventListener("click", () => {
     dismiss();
     onConfirm();
@@ -297,7 +396,10 @@ function showUpdateConfirm(version: string, releaseNotes: string, onConfirm: () 
 
 function updateNoticeProgress(text: string): void {
   const btn = document.querySelector(".update-notice-action") as HTMLButtonElement | null;
-  if (btn) btn.textContent = text;
+  if (btn) {
+    btn.textContent = text;
+    btn.disabled = true;
+  }
 }
 
 function resetUpdateNotice(): void {
@@ -312,15 +414,16 @@ function resetUpdateNotice(): void {
   }
 }
 
-function showUpdateNotice(version: string, releaseNotes: string, onInstall: () => void): void {
+function showUpdateNotice(version: string, releaseNotes: string): void {
   const footer = document.getElementById("sidebar-footer");
   if (!footer) return;
 
-  // If a notice already exists, update its version text and bail
+  // If a notice already exists, update its version text and re-render for state
   const existing = footer.querySelector(".update-notice");
   if (existing) {
     const ver = existing.querySelector(".update-notice-version");
     if (ver) ver.textContent = version;
+    renderNoticeForState();
     return;
   }
 
@@ -334,7 +437,6 @@ function showUpdateNotice(version: string, releaseNotes: string, onInstall: () =
   text.className = "update-notice-text";
   const label = document.createElement("span");
   label.className = "update-notice-label";
-  label.textContent = "Update available";
   const ver = document.createElement("span");
   ver.className = "update-notice-version";
   ver.textContent = version;
@@ -343,7 +445,6 @@ function showUpdateNotice(version: string, releaseNotes: string, onInstall: () =
 
   const btn = document.createElement("button");
   btn.className = "btn btn--primary update-notice-action";
-  btn.textContent = "Update";
 
   notice.appendChild(dot);
   notice.appendChild(text);
@@ -351,13 +452,60 @@ function showUpdateNotice(version: string, releaseNotes: string, onInstall: () =
 
   footer.insertBefore(notice, footer.firstChild);
 
+  // Click handler dispatches by current state — capture releaseNotes for the
+  // confirm dialog.
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    showUpdateConfirm(version, releaseNotes, () => {
-      btn.textContent = "Installing\u2026";
+    if (updateState === "available") {
+      downloadPending().catch(() => {});
+    } else if (updateState === "staged") {
+      showUpdateConfirm(version, releaseNotes, () => {
+        installPending({ relaunchAfter: true });
+      });
+    }
+  });
+
+  renderNoticeForState();
+}
+
+/** Update the notice label + button to match `updateState`. Pure render —
+ *  safe to call any number of times. */
+function renderNoticeForState(): void {
+  const notice = document.querySelector(".update-notice");
+  if (!notice) return;
+  const label = notice.querySelector(".update-notice-label") as HTMLElement | null;
+  const btn = notice.querySelector(".update-notice-action") as HTMLButtonElement | null;
+  if (!label || !btn) return;
+
+  switch (updateState) {
+    case "available":
+      label.textContent = "Update available";
+      btn.textContent = "Download";
+      btn.disabled = false;
+      notice.classList.remove("installing");
+      break;
+    case "downloading":
+      label.textContent = "Update available";
+      btn.textContent = "Downloading…";
+      btn.disabled = true;
+      notice.classList.remove("installing");
+      break;
+    case "staged":
+      label.textContent = "Update ready — applies on quit";
+      btn.textContent = "Install Now";
+      btn.disabled = false;
+      notice.classList.remove("installing");
+      break;
+    case "installing":
+      label.textContent = "Update ready";
+      btn.textContent = "Installing…";
       btn.disabled = true;
       notice.classList.add("installing");
-      onInstall();
-    });
-  });
+      break;
+    case "failed":
+    case "idle":
+      // No-op — failed leaves the manual-download fallback from
+      // resetUpdateNotice(); idle should never have a notice mounted.
+      break;
+  }
 }
