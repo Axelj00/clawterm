@@ -179,7 +179,7 @@ Notifications are suppressed for the currently focused tab when the app window i
 | --- | --- | --- | --- | --- |
 | `updates.autoCheck` | `boolean` | `true` | — | Check for updates automatically on launch and periodically. |
 | `updates.checkIntervalMs` | `number` | `3_600_000` (1 hour) | `300_000`–`86_400_000` (5 min – 24 h) | How often to poll for updates. |
-| `updates.autoInstall` | `boolean` | `false` | — | Silently install updates instead of prompting. |
+| `updates.mode` | `string` | `"download"` | `"manual"` \| `"download"` \| `"auto"` | How updates are handled. `"manual"` waits for you to click Download. `"download"` (default) fetches the bundle in the background and applies it on next quit (or sooner if you click Install). `"auto"` downloads, installs, and restarts immediately on detection. |
 
 ## worktree
 

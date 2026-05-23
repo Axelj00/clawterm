@@ -65,7 +65,12 @@ export interface Config {
   updates: {
     autoCheck: boolean;
     checkIntervalMs: number;
-    autoInstall: boolean;
+    /** When an update is available:
+     *   "manual"   — wait for user click before downloading
+     *   "download" — fetch in background, prompt to install or apply on next quit
+     *   "auto"     — fetch + install + relaunch immediately on detection
+     * Migrated from the legacy `autoInstall` boolean. */
+    mode: "manual" | "download" | "auto";
   };
   worktree: {
     directory: string;

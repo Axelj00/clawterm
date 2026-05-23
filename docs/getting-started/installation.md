@@ -57,7 +57,7 @@ Update behaviour is controlled by the `updates` section in `config.json` — see
 
 - `updates.autoCheck` — turn auto-checking on or off
 - `updates.checkIntervalMs` — how often to poll (5 minutes to 24 hours)
-- `updates.autoInstall` — silently install updates without prompting
+- `updates.mode` — `"manual"`, `"download"` (default — stage in background, apply on next quit), or `"auto"` (install + restart immediately)
 
 You can also trigger a manual update check from the settings page.
 

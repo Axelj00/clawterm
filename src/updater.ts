@@ -18,7 +18,7 @@ let autoInstallEnabled = false;
 let pendingUpdate: Awaited<ReturnType<typeof check>> = null;
 
 export function startUpdateChecker(config: Config): void {
-  autoInstallEnabled = config.updates.autoInstall ?? false;
+  autoInstallEnabled = config.updates.mode === "auto";
   if (!config.updates.autoCheck) {
     logger.debug("Auto-update checking disabled via config");
     return;

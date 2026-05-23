@@ -8,7 +8,7 @@ export type { Config, UserMatcher } from "./config-types";
 import type { Config } from "./config-types";
 
 /** Current config schema version. Bump when adding/changing config fields. */
-const CONFIG_VERSION = 4;
+const CONFIG_VERSION = 5;
 
 /** Return the default shell. */
 function defaultShell(): string {
@@ -131,7 +131,7 @@ export const DEFAULT_CONFIG: Config = {
   updates: {
     autoCheck: true,
     checkIntervalMs: 3_600_000,
-    autoInstall: false,
+    mode: "download",
   },
   advanced: {
     pollIntervalMs: 1000,
@@ -303,6 +303,11 @@ export function validateConfig(config: Config, corrections?: string[]): Config {
       warn("updates.checkIntervalMs", "must be 300000–86400000 (5 min – 24 hours)");
       result.updates = { ...result.updates, checkIntervalMs: DEFAULT_CONFIG.updates.checkIntervalMs };
     }
+    const mode = result.updates.mode;
+    if (mode !== "manual" && mode !== "download" && mode !== "auto") {
+      warn("updates.mode", `must be "manual", "download", or "auto"`);
+      result.updates = { ...result.updates, mode: DEFAULT_CONFIG.updates.mode };
+    }
   }
 
   return result;
@@ -359,6 +364,21 @@ function migrateConfig(config: Record<string, unknown>): void {
       delete notifications.sound;
     }
     logger.debug("Migrated config from v3 to v4");
+  }
+
+  // Migration 4 → 5: replace updates.autoInstall:boolean with updates.mode
+  // tri-state. autoInstall:true → "auto" (preserve intent); false/absent →
+  // "download" (auto-download in background, install on user click or on next
+  // quit — same friction as before plus install-on-quit so long-running
+  // sessions aren't interrupted). (#558)
+  if (version < 5) {
+    config.configVersion = 5;
+    const updates = config.updates as Record<string, unknown> | undefined;
+    if (updates && !("mode" in updates)) {
+      updates.mode = updates.autoInstall === true ? "auto" : "download";
+      delete updates.autoInstall;
+    }
+    logger.debug("Migrated config from v4 to v5");
   }
 
   // Migration: strip legacy theme fields from user config
