@@ -254,7 +254,16 @@ pub fn run_git_status(path: &std::path::Path) -> Result<GitStatus, String> {
     // fail the entire git status, so the badge just hides. Runs on the
     // same cached schedule as the rest of git status (3s TTL), and the
     // overall cache evicts together.
-    let (lines_added, lines_removed) = compute_diff_stats(path).unwrap_or((0, 0));
+    //
+    // Short-circuit clean trees (#561): when there are no modified, staged,
+    // or untracked files, both git diff and git ls-files would produce empty
+    // output. Skipping them saves two subprocess spawns per cache miss per
+    // pane, which is the common case during agent idle time.
+    let (lines_added, lines_removed) = if modified == 0 && staged == 0 && untracked == 0 {
+        (0, 0)
+    } else {
+        compute_diff_stats(path).unwrap_or((0, 0))
+    };
 
     Ok(GitStatus {
         branch,
@@ -420,6 +429,10 @@ mod tests {
         assert_eq!(status.staged, 0);
         assert_eq!(status.untracked, 0);
         assert!(!status.is_worktree);
+        // Clean tree short-circuit (#561): diff stats are 0 without spawning
+        // git diff / git ls-files subprocesses.
+        assert_eq!(status.lines_added, 0);
+        assert_eq!(status.lines_removed, 0);
         let _ = fs::remove_dir_all(&dir);
     }
 
