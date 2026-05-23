@@ -274,6 +274,19 @@ export function createDefaultPaneState(): PaneState {
   };
 }
 
+/** Bucket-quantize a diff line count for the +N/-N badge. Mirrors the
+ *  display-quantization strategy of formatResidentSize: the key only
+ *  changes when the visible bucket flips, so a 1-line edit during active
+ *  typing doesn't trigger a full footer repaint. Returns "" for n<=0 so
+ *  the badge collapses cleanly. (#562) */
+export function formatDiffCount(n: number): string {
+  if (n <= 0) return "";
+  if (n < 10) return String(n);
+  if (n < 100) return `${Math.floor(n / 10) * 10}+`;
+  if (n < 1000) return `${Math.floor(n / 100) * 100}+`;
+  return "1k+";
+}
+
 /** Format a byte count as a short human-readable badge string ("156M",
  *  "1.2G", "42K"). Mirrors htop's display style — base-1024 units to
  *  match the macOS Memory column convention. Returns "" for null/zero

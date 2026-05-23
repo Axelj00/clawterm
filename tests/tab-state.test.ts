@@ -3,6 +3,7 @@ import {
   createDefaultTabState,
   createDefaultPaneState,
   computeFolderTitle,
+  formatDiffCount,
   formatElapsed,
   formatResidentSize,
   parseStatusLine,
@@ -329,5 +330,34 @@ describe("formatResidentSize", () => {
     expect(formatResidentSize(1.2 * 1024 * 1024 * 1024)).toBe("1.2G");
     expect(formatResidentSize(4 * 1024 * 1024 * 1024)).toBe("4.0G");
     expect(formatResidentSize(12 * 1024 * 1024 * 1024)).toBe("12G");
+  });
+});
+
+describe("formatDiffCount", () => {
+  it("returns empty string for non-positive values so the badge collapses", () => {
+    expect(formatDiffCount(0)).toBe("");
+    expect(formatDiffCount(-5)).toBe("");
+  });
+
+  it("shows exact values under 10", () => {
+    expect(formatDiffCount(1)).toBe("1");
+    expect(formatDiffCount(9)).toBe("9");
+  });
+
+  it("buckets to nearest 10 under 100", () => {
+    expect(formatDiffCount(10)).toBe("10+");
+    expect(formatDiffCount(35)).toBe("30+");
+    expect(formatDiffCount(99)).toBe("90+");
+  });
+
+  it("buckets to nearest 100 under 1000", () => {
+    expect(formatDiffCount(100)).toBe("100+");
+    expect(formatDiffCount(482)).toBe("400+");
+    expect(formatDiffCount(999)).toBe("900+");
+  });
+
+  it("collapses to 1k+ at four digits", () => {
+    expect(formatDiffCount(1000)).toBe("1k+");
+    expect(formatDiffCount(50000)).toBe("1k+");
   });
 });

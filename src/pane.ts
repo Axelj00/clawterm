@@ -16,6 +16,7 @@ import {
   type PaneState,
   type StatusLineData,
   createDefaultPaneState,
+  formatDiffCount,
   formatElapsed,
   formatResidentSize,
 } from "./tab-state";
@@ -758,7 +759,12 @@ export class Pane {
     // the bucket actually changes — avoids per-poll churn for sub-megabyte
     // jitter. (#560)
     const rssDisplay = formatResidentSize(s.residentSize);
-    const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${gs?.lines_added ?? ""}|${gs?.lines_removed ?? ""}|${slKey}|${rssDisplay}`;
+    // Bucket-quantize lines_added/removed (#562) the same way RSS is bucketed:
+    // the structuralKey only changes when the visible bucket flips, so a
+    // 1-line edit during active typing doesn't trigger a full footer repaint.
+    const addedDisplay = formatDiffCount(gs?.lines_added ?? 0);
+    const removedDisplay = formatDiffCount(gs?.lines_removed ?? 0);
+    const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${addedDisplay}|${removedDisplay}|${slKey}|${rssDisplay}`;
     const elapsed = formatElapsed(this.createdAt);
 
     if (structuralKey === this.footerStructuralKey) {
@@ -779,13 +785,14 @@ export class Pane {
       }
     }
     // Lines-changed badge \u2014 hidden when working tree matches HEAD. (#559)
-    if (gs && (gs.lines_added > 0 || gs.lines_removed > 0)) {
+    // Badge text is bucket-quantized (#562); the tooltip retains exact counts.
+    if (gs && (addedDisplay || removedDisplay)) {
       const tooltip = `${gs.lines_added} added, ${gs.lines_removed} removed`;
-      if (gs.lines_added > 0) {
-        pushSpan(this.footerRow, "footer-diff-added", `+${gs.lines_added}`, tooltip);
+      if (addedDisplay) {
+        pushSpan(this.footerRow, "footer-diff-added", `+${addedDisplay}`, tooltip);
       }
-      if (gs.lines_removed > 0) {
-        pushSpan(this.footerRow, "footer-diff-removed", `-${gs.lines_removed}`, tooltip);
+      if (removedDisplay) {
+        pushSpan(this.footerRow, "footer-diff-removed", `-${removedDisplay}`, tooltip);
       }
     }
     // Memory badge \u2014 hidden when value is null/zero, sits between the
