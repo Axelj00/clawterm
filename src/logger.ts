@@ -69,8 +69,6 @@ export const logger = {
     return logCount;
   },
 
-  /** Ring-buffer ceiling (#566). Surfaced by memory-diagnostics so long-session
-   *  reports can show "X / Y" rather than just "X". */
   getBufferMax(): number {
     return LOG_BUFFER_MAX;
   },

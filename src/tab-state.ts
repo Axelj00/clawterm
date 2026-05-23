@@ -274,11 +274,9 @@ export function createDefaultPaneState(): PaneState {
   };
 }
 
-/** Bucket-quantize a diff line count for the +N/-N badge. Mirrors the
- *  display-quantization strategy of formatResidentSize: the key only
- *  changes when the visible bucket flips, so a 1-line edit during active
- *  typing doesn't trigger a full footer repaint. Returns "" for n<=0 so
- *  the badge collapses cleanly. (#562) */
+/** Bucket-quantize a diff line count so the footer's structuralKey only
+ *  changes at visible bucket boundaries (mirrors formatResidentSize). A
+ *  1-line edit during active typing doesn't trigger a full footer repaint. */
 export function formatDiffCount(n: number): string {
   if (n <= 0) return "";
   if (n < 10) return String(n);
@@ -384,9 +382,6 @@ const BRANCH_COLORS = [
 const BRANCH_COLOR_CACHE_MAX = 256;
 const branchColorCache = new Map<string, string>();
 
-/** Diagnostic accessor: number of distinct branches that have been
- *  color-assigned this session, paired with the bounded ceiling. Surfaced
- *  by the memory-diagnostics command (#566). */
 export function getBranchColorCacheSize(): { size: number; max: number } {
   return { size: branchColorCache.size, max: BRANCH_COLOR_CACHE_MAX };
 }

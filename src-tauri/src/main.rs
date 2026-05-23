@@ -236,10 +236,8 @@ fn refresh_macos_bundle_icon_cache() -> Result<(), String> {
     Ok(())
 }
 
-/// Resident memory + statusline-dir occupancy for the memory-diagnostics
-/// modal (#566). Returns 0/0 instead of failing so the UI can show "?"
-/// for the unknown bits without surfacing an error path for what is a
-/// best-effort diagnostic.
+/// Returns 0/0 instead of failing so the diagnostics UI can show "?" for
+/// the unknown bits without an error path on a best-effort signal.
 #[tauri::command]
 fn get_memory_diagnostics() -> serde_json::Value {
     let rss = process_info::self_resident_size().unwrap_or(0);
@@ -271,14 +269,10 @@ fn main() {
             let handle = app.handle().clone();
             menu::build_and_set(&handle)?;
 
-            // Periodic claude_status stale-file sweep (#567). The frontend's
-            // call to setup_claude_statusline triggers an initial sweep at
-            // boot, but agent processes that come and go during a long
-            // ClawTerm session each leave a <pid>.json behind in
-            // /tmp/clawterm-status/. For users running multi-week sessions
-            // (the workflow this app is designed around) the dir would
-            // otherwise grow until the next ClawTerm restart. The sweep
-            // is cheap (single read_dir + pid_alive per entry) and idempotent.
+            // Without a periodic re-sweep, /tmp/clawterm-status/ grows for the
+            // lifetime of a multi-week ClawTerm session — the boot-time sweep
+            // from setup_claude_statusline only catches files left by prior
+            // sessions, not by agents that come and go during this one. (#567)
             std::thread::Builder::new()
                 .name("claude-status-sweeper".into())
                 .spawn(|| {

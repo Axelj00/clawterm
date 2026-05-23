@@ -7,10 +7,8 @@ import { logger } from "./logger";
  * browser exhaustion (#135) while keeping recently-used tabs' contexts alive
  * to eliminate create/destroy overhead on tab switch (#290).
  */
-/** Ceiling on concurrent WebGL contexts (#290). Sized to leave headroom
- *  below the browser's hard limit (typically 8-16 — exhausting it kills
- *  all contexts at once). Exported so the memory-diagnostics modal can
- *  surface "active/max" (#566). */
+/** Sized to leave headroom below the browser's hard limit (typically
+ *  8-16 — exhausting it kills all contexts at once). (#290) */
 export const WEBGL_POOL_MAX = 6;
 
 class WebGLPool {
@@ -43,17 +41,9 @@ class WebGLPool {
 /** Shared pool instance */
 const pool = new WebGLPool();
 
-/**
- * Manages WebGL + Image addon lifecycle for a terminal pane.
- * Extracted from Pane to isolate GPU-related concerns.
- * Uses a shared LRU pool to keep recently-used contexts alive (#290).
- */
-/** Per-pane image-storage cap (#565). The xterm.js ImageAddon defaults to
- *  128 MB per pane, which on an 8-pane workspace can pin ~1 GB to images
- *  alone. 32 MB still holds several screenshot-sized PNGs while keeping
- *  the worst-case multi-pane footprint bounded. The cap is FIFO-evicted,
- *  so an active image-heavy session sees older bitmaps replaced with the
- *  placeholder glyph rather than failing. */
+/** xterm.js ImageAddon defaults to 128 MB per pane; on an 8-pane workspace
+ *  that pins ~1 GB to image bitmaps alone. 32 MB still holds several
+ *  screenshot-sized PNGs while keeping the multi-pane footprint bounded. */
 const IMAGE_STORAGE_LIMIT_MB = 32;
 
 interface ImageAddonHandle {
@@ -62,6 +52,11 @@ interface ImageAddonHandle {
   readonly storageUsage: number;
 }
 
+/**
+ * Manages WebGL + Image addon lifecycle for a terminal pane.
+ * Extracted from Pane to isolate GPU-related concerns.
+ * Uses a shared LRU pool to keep recently-used contexts alive (#290).
+ */
 export class WebGLManager {
   private webglAddon: WebglAddon | null = null;
   private imageAddon: ImageAddonHandle | null = null;
@@ -141,17 +136,10 @@ export class WebGLManager {
     }
   }
 
-  /** Reset image storage for this pane (FIFO-evicts all stored bitmaps).
-   *  Surfaced via the "Reset Pane Images" command palette entry as a manual
-   *  escape hatch for when a session has pinned a lot of image memory and
-   *  the user wants to reclaim it without closing the pane. (#565) */
   resetImages(): void {
     this.imageAddon?.reset();
   }
 
-  /** Current image-addon storage usage in MB (0 if the addon isn't loaded
-   *  or no images are stored). Surfaced by the memory-diagnostics command
-   *  to attribute RAM growth per pane. (#565, #566) */
   getImageStorageMb(): number {
     return this.imageAddon?.storageUsage ?? 0;
   }

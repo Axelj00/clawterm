@@ -160,9 +160,6 @@ export class TerminalManager {
   private configWriteTimer: ReturnType<typeof setTimeout> | null = null;
   /** AbortController for document-level event listeners — aborted on dispose */
   private readonly ac = new AbortController();
-  /** Epoch ms captured when this TerminalManager is constructed — surfaced
-   *  by the memory-diagnostics modal so a 5-min session and a 3-week session
-   *  can be told apart at a glance. (#566) */
   private readonly startedAt = Date.now();
 
   /** Unlock a worktree and then remove it. Unlock is needed because we lock
@@ -1418,19 +1415,7 @@ export class TerminalManager {
         id: "reset-pane-images",
         label: "Reset Pane Images",
         category: "Panes",
-        action: () => {
-          const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
-          const pane = tab?.getFocusedPane();
-          if (!pane) return;
-          const before = pane.getImageStorageMb();
-          pane.resetImages();
-          showToast(
-            before > 0
-              ? `Reset image storage (≈${Math.round(before)} MB freed)`
-              : "Reset image storage",
-            "info",
-          );
-        },
+        action: () => this.resetActivePaneImages(),
       },
       {
         id: "focus-next-pane",
@@ -1587,6 +1572,18 @@ export class TerminalManager {
     if (!tab.closeFocusedPane()) {
       this.closeTab(this.activeTabId);
     }
+  }
+
+  private resetActivePaneImages() {
+    const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : null;
+    const pane = tab?.getFocusedPane();
+    if (!pane) return;
+    const before = pane.getImageStorageMb();
+    pane.resetImages();
+    showToast(
+      before > 0 ? `Reset image storage (≈${Math.round(before)} MB freed)` : "Reset image storage",
+      "info",
+    );
   }
 
   /** Close multiple tabs with confirmation. */

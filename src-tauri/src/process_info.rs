@@ -139,53 +139,48 @@ fn claude_status_path_if_fresh(pid: u32) -> Option<std::path::PathBuf> {
     Some(path)
 }
 
-/// RSS of the ClawTerm process itself, for the memory-diagnostics modal
-/// (#566). Returns None on syscall failure rather than 0 so the caller can
-/// distinguish "unknown" from "zero". Reuses `proc_resident_size` so the
-/// PROC_PIDTASKINFO struct layout has one source of truth.
+/// RSS of the ClawTerm process itself. Returns None on syscall failure so
+/// callers can distinguish "unknown" from "zero".
 pub fn self_resident_size() -> Option<u64> {
     platform::proc_resident_size(std::process::id())
 }
 
-/// Count `<pid>.json` files currently in `CLAUDE_STATUS_DIR` — diagnostic
-/// signal for the memory-diagnostics modal (#566). A multi-week session
-/// with this number climbing suggests the periodic sweep (#567) isn't
-/// keeping up, or agents are dying faster than once an hour.
-pub fn count_claude_status_files() -> u32 {
+/// Iterate `<pid>.json` entries in `CLAUDE_STATUS_DIR`, yielding the parsed
+/// PID and the entry's `DirEntry` (callers that need the path can build it
+/// via `entry.path()`). Reads `file_name` rather than `path()` so we don't
+/// allocate a `PathBuf` per entry just to peel the stem off.
+fn for_each_status_pid<F: FnMut(u32, std::fs::DirEntry)>(mut f: F) {
     let Ok(entries) = std::fs::read_dir(CLAUDE_STATUS_DIR) else {
-        return 0;
+        return;
     };
-    let mut n: u32 = 0;
     for entry in entries.flatten() {
-        if entry.path().file_stem().and_then(|s| s.to_str()).and_then(|s| s.parse::<u32>().ok()).is_some() {
-            n += 1;
-        }
+        let name = entry.file_name();
+        let Some(s) = name.to_str() else { continue };
+        let Some(stem) = s.strip_suffix(".json") else { continue };
+        let Ok(pid) = stem.parse::<u32>() else { continue };
+        f(pid, entry);
     }
+}
+
+/// Count `<pid>.json` files currently in `CLAUDE_STATUS_DIR`. A climbing
+/// number against a long uptime suggests the hourly sweep isn't keeping up.
+pub fn count_claude_status_files() -> u32 {
+    let mut n: u32 = 0;
+    for_each_status_pid(|_pid, _entry| n += 1);
     n
 }
 
 /// Remove any `<pid>.json` files in `CLAUDE_STATUS_DIR` whose PID is no
-/// longer alive. Called at startup from `setup_claude_statusline` and
-/// then hourly by the claude-status-sweeper thread (#567) — keeps the
-/// directory bounded both across ClawTerm sessions and during long-lived
-/// sessions where agent processes come and go.
+/// longer alive. Runs at startup from `setup_claude_statusline` and then
+/// hourly from the claude-status-sweeper thread — bounds the directory
+/// both across sessions and during long-running ones where agents come
+/// and go.
 pub fn sweep_stale_claude_status_files() {
-    let dir = std::path::Path::new(CLAUDE_STATUS_DIR);
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
-            continue;
-        };
-        let Ok(pid) = stem.parse::<u32>() else {
-            continue;
-        };
+    for_each_status_pid(|pid, entry| {
         if !platform::pid_alive(pid) {
-            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(entry.path());
         }
-    }
+    });
 }
 
 /// Convert a full CWD path to a display folder name.

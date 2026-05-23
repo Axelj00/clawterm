@@ -759,9 +759,6 @@ export class Pane {
     // the bucket actually changes — avoids per-poll churn for sub-megabyte
     // jitter. (#560)
     const rssDisplay = formatResidentSize(s.residentSize);
-    // Bucket-quantize lines_added/removed (#562) the same way RSS is bucketed:
-    // the structuralKey only changes when the visible bucket flips, so a
-    // 1-line edit during active typing doesn't trigger a full footer repaint.
     const addedDisplay = formatDiffCount(gs?.lines_added ?? 0);
     const removedDisplay = formatDiffCount(gs?.lines_removed ?? 0);
     const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${addedDisplay}|${removedDisplay}|${slKey}|${rssDisplay}`;
@@ -785,7 +782,7 @@ export class Pane {
       }
     }
     // Lines-changed badge \u2014 hidden when working tree matches HEAD. (#559)
-    // Badge text is bucket-quantized (#562); the tooltip retains exact counts.
+    // Tooltip retains exact counts even though the badge is bucket-quantized.
     if (gs && (addedDisplay || removedDisplay)) {
       const tooltip = `${gs.lines_added} added, ${gs.lines_removed} removed`;
       if (addedDisplay) {
@@ -1300,34 +1297,24 @@ export class Pane {
     this.webgl?.deactivate(contextLost);
   }
 
-  /** Reset this pane's xterm.js ImageAddon storage (#565). No-op when the
-   *  pane has no WebGL/Image addons loaded yet. */
   resetImages() {
     this.webgl?.resetImages();
   }
 
-  /** Current image-storage usage for this pane in MB (#565, #566). Returns
-   *  0 when no images are stored or the addon isn't loaded. */
   getImageStorageMb(): number {
     return this.webgl?.getImageStorageMb() ?? 0;
   }
 
-  /** Current scrollback-buffer line count (used by memory-diagnostics). The
-   *  active buffer's `length` is the total rows including the visible viewport,
-   *  which is the most honest representation of what xterm.js has allocated. */
+  /** Active buffer length includes the visible viewport, not just scrollback —
+   *  the honest measure of what xterm.js has allocated. */
   getScrollbackLines(): number {
     return this.terminal.buffer.active.length;
   }
 
-  /** Hidden-pane PTY-write backlog in bytes (#566). 0 when the pane is
-   *  visible or has drained the queue. Useful to attribute "why is this
-   *  pane heavy?" when a background tab is being slammed with output. */
   getPendingBytes(): number {
     return this.pendingBytes;
   }
 
-  /** Whether this pane currently has a WebGL renderer attached. Used by
-   *  memory-diagnostics to count pool occupancy. (#566) */
   isWebGLActive(): boolean {
     return this.webgl?.active ?? false;
   }

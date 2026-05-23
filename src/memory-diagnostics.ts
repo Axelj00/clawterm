@@ -2,11 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { trapFocus } from "./utils";
 import { showToast } from "./toast";
 import { logger } from "./logger";
-import { formatResidentSize, getBranchColorCacheSize } from "./tab-state";
+import { computeFolderTitle, formatResidentSize, getBranchColorCacheSize } from "./tab-state";
 import type { Tab } from "./tab";
 import type { NotificationTray } from "./notification-tray";
 
-/** Rust-side counters (#566). Returned by `get_memory_diagnostics`. */
 interface RustDiagnostics {
   rssBytes: number;
   statuslineFiles: number;
@@ -15,10 +14,7 @@ interface RustDiagnostics {
 export interface MemoryDiagnosticsContext {
   tabs: Map<string, Tab>;
   notificationTray: NotificationTray;
-  /** Epoch ms when TerminalManager started. Surfaces "uptime" so a 5-min
-   *  session and a 3-week session can be told apart at a glance. */
   startedAt: number;
-  /** Static WebGL-context ceiling from `WebGLPool`. */
   webglMax: number;
 }
 
@@ -62,9 +58,8 @@ function formatUptime(ms: number): string {
   return `${m}m`;
 }
 
-/** Cross-browser shape: Chromium's `performance.measureUserAgentSpecificMemory`
- *  returns `{ bytes, breakdown }`. Only available in cross-origin-isolated
- *  contexts; we fall back to null when unsupported. */
+// performance.measureUserAgentSpecificMemory isn't in lib.dom.d.ts and is only
+// available in cross-origin-isolated Chromium contexts — declare it locally.
 interface MemoryMeasurement {
   bytes: number;
 }
@@ -87,7 +82,7 @@ async function measureJsHeapBytes(): Promise<number | null> {
 function collectPaneRows(tabs: Map<string, Tab>): PaneRow[] {
   const rows: PaneRow[] = [];
   for (const tab of tabs.values()) {
-    const folder = tab.state.folderName || tab.id;
+    const folder = computeFolderTitle(tab.state);
     for (const pane of tab.getPanes()) {
       rows.push({
         tabTitle: folder,
@@ -161,7 +156,7 @@ function formatReport(r: ReportData): string {
   } else {
     for (const p of r.panes) {
       const rss = formatResidentSize(p.residentBytes) || "?";
-      const pending = p.pendingBytes > 0 ? `  pending=${Math.round(p.pendingBytes / 1024)}KB` : "";
+      const pending = p.pendingBytes > 0 ? `  pending=${formatResidentSize(p.pendingBytes)}` : "";
       const webgl = p.webgl ? "" : "  canvas";
       lines.push(
         `  ${p.tabTitle.padEnd(18)} pane=${p.paneId}  scrollback=${p.scrollbackLines}  image=${p.imageMb.toFixed(1)}MB  rss=${rss}${pending}${webgl}`,
@@ -173,14 +168,11 @@ function formatReport(r: ReportData): string {
   lines.push("Aggregates:");
   lines.push(`  Image storage    ${r.imageMbTotal.toFixed(1)} MB`);
   lines.push(`  Scrollback       ${r.scrollbackLinesTotal} lines across ${r.panes.length} panes`);
-  lines.push(`  Pending PTY      ${Math.round(r.pendingBytesTotal / 1024)} KB queued (hidden panes)`);
+  lines.push(`  Pending PTY      ${formatResidentSize(r.pendingBytesTotal) || "0B"} queued (hidden panes)`);
   lines.push("");
 
   lines.push("Process:");
-  lines.push(
-    `  RSS              ${r.rssBytes > 0 ? formatResidentSize(r.rssBytes) : "?"}` +
-      `${r.rssBytes > 0 ? `  (${(r.rssBytes / (1024 * 1024)).toFixed(0)} MB)` : ""}`,
-  );
+  lines.push(`  RSS              ${r.rssBytes > 0 ? formatResidentSize(r.rssBytes) : "?"}`);
   if (r.jsHeapBytes != null) {
     lines.push(`  JS heap          ${formatResidentSize(r.jsHeapBytes)} (Chromium measureUserAgentSpecificMemory)`);
   } else {
@@ -190,10 +182,7 @@ function formatReport(r: ReportData): string {
   return lines.join("\n");
 }
 
-/** Memory diagnostics modal (#566). One-shot snapshot — render once, copy
- *  button copies the text report. No live refresh; the user re-opens to
- *  resnapshot. Reuses the palette-modal frame for visual consistency with
- *  the notification panels. */
+/** One-shot snapshot — no live refresh; the user re-opens to resnapshot. */
 export async function showMemoryDiagnostics(ctx: MemoryDiagnosticsContext): Promise<void> {
   document.querySelector(".memory-diagnostics-overlay")?.remove();
 
