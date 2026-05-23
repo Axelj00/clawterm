@@ -49,9 +49,11 @@ export function showNotificationSettings({
   enableRow.appendChild(enableLabel);
 
   enableCheckbox.addEventListener("change", () => {
-    const next: NotificationsConfig = { ...config, enabled: enableCheckbox.checked };
-    onChange(next);
-    notifications.updateConfig(next);
+    // onChange persists the new config to disk; the caller is also
+    // responsible for telling the manager to apply the change. This panel
+    // doesn't double-call updateConfig — that would silently diverge from
+    // the persisted state if the caller transforms the config first.
+    onChange({ ...config, enabled: enableCheckbox.checked });
   });
 
   // Permission status
@@ -113,8 +115,13 @@ export function showNotificationSettings({
   document.body.appendChild(overlay);
 
   const removeTrap = trapFocus(modal);
+  const onFocus = () => {
+    refreshPermission();
+    notifications.recheckPermission().catch(() => {});
+  };
   const dismiss = () => {
     removeTrap();
+    window.removeEventListener("focus", onFocus);
     overlay.remove();
   };
 
@@ -125,15 +132,7 @@ export function showNotificationSettings({
     if (e.key === "Escape") dismiss();
   });
 
-  // Re-check permission when the user comes back from System Settings.
-  const onFocus = () => {
-    refreshPermission();
-    notifications.recheckPermission().catch(() => {});
-  };
   window.addEventListener("focus", onFocus);
-  overlay.addEventListener("remove" as keyof HTMLElementEventMap, () => {
-    window.removeEventListener("focus", onFocus);
-  });
 
   enableCheckbox.focus();
 

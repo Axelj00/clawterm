@@ -1459,6 +1459,7 @@ export class TerminalManager {
             config: this.config.notifications,
             onChange: (next) => {
               this.config.notifications = next;
+              this.notifications.updateConfig(next);
               this.persistConfig();
             },
           }),

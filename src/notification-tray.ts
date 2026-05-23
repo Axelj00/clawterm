@@ -78,11 +78,17 @@ export class NotificationTray {
   }
 }
 
+/** Closure that tears down the most recently mounted tray panel —
+ *  removes the overlay, unsubscribes from the store, releases focus
+ *  trap. Tracked at module scope so a re-open doesn't leak the prior
+ *  subscription. */
+let lastTrayDismiss: (() => void) | null = null;
+
 /** Render the tray panel. Reuses the palette-modal frame; lays out as a
  *  list of NotificationRecord rows, each click-to-focus. Subscribes to
  *  the store so newly-arriving events appear without a re-open. */
 export function showNotificationTray(tray: NotificationTray): void {
-  document.querySelector(".notification-tray-overlay")?.remove();
+  lastTrayDismiss?.();
 
   const overlay = document.createElement("div");
   overlay.className = "palette-overlay notification-tray-overlay";
@@ -147,7 +153,9 @@ export function showNotificationTray(tray: NotificationTray): void {
     removeTrap();
     unsubscribe();
     overlay.remove();
+    if (lastTrayDismiss === dismiss) lastTrayDismiss = null;
   };
+  lastTrayDismiss = dismiss;
 
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) dismiss();

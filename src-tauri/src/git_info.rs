@@ -161,33 +161,33 @@ pub fn get_git_status_sync(dir: String) -> Result<GitStatus, String> {
     result
 }
 
-/// Run git status and parse the output.  Uses a 3-second subprocess timeout
-/// to prevent a hung `git status` (NFS, corrupted index) from blocking the
-/// poll batch and exhausting the Tauri thread pool.
-pub fn run_git_status(path: &std::path::Path) -> Result<GitStatus, String> {
+/// Spawn `git <args>` from `cwd` and return its stdout, enforcing
+/// GIT_SUBPROCESS_TIMEOUT so a hung subprocess (NFS, corrupted index,
+/// lock contention) can't block the poll batch indefinitely. Returns
+/// Err if git exits non-zero or the timeout fires.
+fn run_git_with_timeout(args: &[&str], cwd: &std::path::Path) -> Result<String, String> {
     let mut child = std::process::Command::new("git")
-        .args(["--no-optional-locks", "status", "--porcelain=v2", "--branch"])
-        .current_dir(path)
+        .args(args)
+        .current_dir(cwd)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|e| format!("git spawn failed: {}", e))?;
 
-    // Poll for completion with timeout — avoids blocking indefinitely
     let start = Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
                 if !status.success() {
-                    return Err("not a git repo".to_string());
+                    return Err("git exited non-zero".to_string());
                 }
                 break;
             }
             Ok(None) => {
                 if start.elapsed() > GIT_SUBPROCESS_TIMEOUT {
                     let _ = child.kill();
-                    let _ = child.wait(); // reap zombie
-                    return Err("git status timed out".to_string());
+                    let _ = child.wait();
+                    return Err("git timed out".to_string());
                 }
                 std::thread::sleep(Duration::from_millis(10));
             }
@@ -195,13 +195,25 @@ pub fn run_git_status(path: &std::path::Path) -> Result<GitStatus, String> {
         }
     }
 
-    let stdout = {
-        use std::io::Read;
-        let mut buf = String::new();
-        if let Some(mut out) = child.stdout.take() {
-            let _ = out.read_to_string(&mut buf);
-        }
-        buf
+    use std::io::Read;
+    let mut buf = String::new();
+    if let Some(mut out) = child.stdout.take() {
+        let _ = out.read_to_string(&mut buf);
+    }
+    Ok(buf)
+}
+
+/// Run git status and parse the output. Uses a 3-second subprocess timeout
+/// (via run_git_with_timeout) to prevent a hung `git status` from blocking
+/// the poll batch and exhausting the Tauri thread pool.
+pub fn run_git_status(path: &std::path::Path) -> Result<GitStatus, String> {
+    let stdout = match run_git_with_timeout(
+        &["--no-optional-locks", "status", "--porcelain=v2", "--branch"],
+        path,
+    ) {
+        Ok(s) => s,
+        Err(e) if e == "git exited non-zero" => return Err("not a git repo".to_string()),
+        Err(e) => return Err(e),
     };
     let mut branch = String::new();
     let mut modified: u32 = 0;
@@ -261,61 +273,71 @@ pub fn run_git_status(path: &std::path::Path) -> Result<GitStatus, String> {
 /// Binary files (numstat returns `- -`) count as 0. Returns the (added,
 /// removed) tuple; on any failure returns Err so the caller can hide
 /// the badge silently. (#559)
+///
+/// Cost guards: both git subprocesses honor GIT_SUBPROCESS_TIMEOUT (3s);
+/// untracked file iteration is bounded at MAX_UNTRACKED_FILES and each
+/// file is line-counted streamingly via BufReader so the cap fires
+/// before the whole file is allocated.
 fn compute_diff_stats(path: &std::path::Path) -> Result<(u32, u32), String> {
-    let diff_out = std::process::Command::new("git")
-        .args(["--no-optional-locks", "diff", "--numstat", "--no-renames", "HEAD"])
-        .current_dir(path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .map_err(|e| format!("git diff spawn failed: {}", e))?;
+    use std::io::{BufRead, BufReader};
+
+    const MAX_UNTRACKED_FILES: usize = 200;
+    const MAX_LINES_PER_FILE: u32 = 5000;
+    const MAX_BYTES_PER_FILE: u64 = 1_048_576;
 
     let mut added: u32 = 0;
     let mut removed: u32 = 0;
-    if diff_out.status.success() {
-        let text = String::from_utf8_lossy(&diff_out.stdout);
-        for line in text.lines() {
-            // Format: "<added>\t<removed>\t<path>". Binary files emit "- -".
-            let mut parts = line.split('\t');
-            let a = parts.next().unwrap_or("-");
-            let r = parts.next().unwrap_or("-");
-            added = added.saturating_add(a.parse::<u32>().unwrap_or(0));
-            removed = removed.saturating_add(r.parse::<u32>().unwrap_or(0));
-        }
+
+    let diff_stdout = run_git_with_timeout(
+        &["--no-optional-locks", "diff", "--numstat", "--no-renames", "HEAD"],
+        path,
+    )?;
+    for line in diff_stdout.lines() {
+        let mut parts = line.split('\t');
+        let a = parts.next().unwrap_or("-");
+        let r = parts.next().unwrap_or("-");
+        added = added.saturating_add(a.parse::<u32>().unwrap_or(0));
+        removed = removed.saturating_add(r.parse::<u32>().unwrap_or(0));
     }
 
-    // Untracked files — count them as lines added so newly-created files
-    // (typical for an agent session) show up in the badge. Skip binary
-    // detection here; counting bytes/lines via `wc -l` over many large
-    // untracked files is the unbounded-cost case, so cap at 1 MB per file
-    // via std::fs::metadata + a 5000 line/file hard cap.
-    let untracked_out = std::process::Command::new("git")
-        .args(["--no-optional-locks", "ls-files", "--others", "--exclude-standard"])
-        .current_dir(path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .map_err(|e| format!("git ls-files spawn failed: {}", e))?;
-
-    if untracked_out.status.success() {
-        let text = String::from_utf8_lossy(&untracked_out.stdout);
-        for rel in text.lines() {
-            if rel.is_empty() {
-                continue;
-            }
-            let file = path.join(rel);
-            let meta = match std::fs::metadata(&file) {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            if !meta.is_file() || meta.len() > 1_048_576 {
-                continue;
-            }
-            if let Ok(contents) = std::fs::read_to_string(&file) {
-                let lines = contents.lines().count().min(5000) as u32;
-                added = added.saturating_add(lines);
+    let untracked_stdout = run_git_with_timeout(
+        &["--no-optional-locks", "ls-files", "--others", "--exclude-standard"],
+        path,
+    )?;
+    let mut counted = 0usize;
+    for rel in untracked_stdout.lines() {
+        if rel.is_empty() {
+            continue;
+        }
+        if counted >= MAX_UNTRACKED_FILES {
+            break;
+        }
+        counted += 1;
+        let file = path.join(rel);
+        let meta = match std::fs::metadata(&file) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if !meta.is_file() || meta.len() > MAX_BYTES_PER_FILE {
+            continue;
+        }
+        let Ok(handle) = std::fs::File::open(&file) else { continue };
+        let reader = BufReader::new(handle);
+        let mut n: u32 = 0;
+        // read_until skips UTF-8 validation and terminates as soon as the
+        // per-file cap hits — bounded work even for the worst case (large
+        // single-line minified asset that scraped past the byte cap).
+        let mut scratch = Vec::with_capacity(256);
+        let mut r = reader;
+        while n < MAX_LINES_PER_FILE {
+            scratch.clear();
+            match r.read_until(b'\n', &mut scratch) {
+                Ok(0) => break,
+                Ok(_) => n = n.saturating_add(1),
+                Err(_) => break,
             }
         }
+        added = added.saturating_add(n);
     }
 
     Ok((added, removed))

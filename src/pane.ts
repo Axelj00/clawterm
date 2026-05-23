@@ -161,15 +161,19 @@ export class Pane {
   idleConsecutive = 0;
   /** Timestamp of last data received from the PTY — used for fit() deferral */
   lastOutputAt = 0;
-  /** Foreground PID seen on the previous poll. Used to detect the
-   *  child-process → shell transition that marks a command finishing. (#552) */
-  lastForegroundPid: number | null = null;
-  /** When the current foreground command started — when fg PID transitions
-   *  away from the shell, record the wall time so the next "back to shell"
-   *  transition can compute the elapsed duration. (#552) */
+  /** Whether the shell was idle (fg PID == shell PID) on the previous poll.
+   *  Null until the first poll lands. Used to detect the child-process →
+   *  shell transition that marks a command finishing. (#552) */
+  wasIdle: boolean | null = null;
+  /** When the current foreground command started — set on the
+   *  shell→child transition, read on the child→shell transition to
+   *  compute elapsed duration. */
   foregroundStartedAt: number | null = null;
-  /** Display name of the foreground process at start. Snapshotted because
-   *  by the time the command finishes the PID is dead and proc_name fails. */
+  /** Display name of the foreground process. Snapshotted because by the
+   *  time the command finishes the PID is dead and proc_name fails. Also
+   *  carries a generation token (foregroundStartedAt at lookup time) so
+   *  a late `get_process_name` resolution from a previous command can't
+   *  overwrite the current command's name. */
   foregroundName: string | null = null;
 
   /** If this pane is in a git worktree, the worktree directory path */

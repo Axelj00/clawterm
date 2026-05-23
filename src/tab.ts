@@ -32,6 +32,25 @@ interface PanePollResult {
   resident_size: number | null;
 }
 
+/** Stamp `pane.foregroundStartedAt` to now and look up the foreground
+ *  process name asynchronously. The IPC isn't awaited so it doesn't
+ *  stall the poll; the started-at timestamp is used as a generation
+ *  token so a late resolution from a previous tracking window can't
+ *  overwrite the current command's name. */
+function startForegroundTracking(pane: Pane, fgPid: number): void {
+  const startedAt = Date.now();
+  pane.foregroundStartedAt = startedAt;
+  pane.foregroundName = null;
+  invoke<string>("get_process_name", { pid: fgPid }).then(
+    (name) => {
+      if (pane.foregroundStartedAt === startedAt) pane.foregroundName = name;
+    },
+    () => {
+      /* name stays null — caller falls back to "command" */
+    },
+  );
+}
+
 export type SplitDirection = "horizontal" | "vertical";
 
 interface SplitBranch {
@@ -796,50 +815,25 @@ export class Tab {
         pane.idleConsecutive = 0;
       }
 
-      // Command-completion detection. Fire when foreground transitions
-      // away from the shell PID (command started) and then back to it
-      // (command finished). Only fires if (a) tab is hidden — no need
-      // to notify about a tab the user is actively looking at, (b) the
-      // command ran long enough to be interesting, gated downstream by
-      // the notification manager's threshold. (#552 phase 1)
-      const prevFg = pane.lastForegroundPid;
-      if (prevFg == null) {
-        // First poll — initialize baseline.
-        if (!newIsIdle) {
-          pane.foregroundStartedAt = Date.now();
-          // Best-effort name lookup; ignore failures so we don't stall the poll.
-          invoke<string>("get_process_name", { pid: fgPgid }).then(
-            (name) => {
-              pane.foregroundName = name;
-            },
-            () => {
-              pane.foregroundName = null;
-            },
-          );
-        }
-      } else if (prevFg !== shellPid && fgPgid === shellPid) {
-        // Foreground just returned to the shell — a command finished.
+      // Command-completion detection (#552 phase 1). Fires when fg
+      // transitions away from the shell (command started) and then back
+      // (command finished), provided the tab is hidden and the duration
+      // exceeds the notification manager's threshold.
+      const wasIdle = pane.wasIdle;
+      if (wasIdle === null) {
+        if (!newIsIdle) startForegroundTracking(pane, fgPgid);
+      } else if (!wasIdle && newIsIdle) {
         const startedAt = pane.foregroundStartedAt;
         const name = pane.foregroundName ?? "command";
         pane.foregroundStartedAt = null;
         pane.foregroundName = null;
         if (startedAt != null && !this.isVisible) {
-          const duration = Date.now() - startedAt;
-          this.onCommandComplete?.(name, duration);
+          this.onCommandComplete?.(name, Date.now() - startedAt);
         }
-      } else if (prevFg === shellPid && fgPgid !== shellPid) {
-        // Foreground just left the shell — a command started.
-        pane.foregroundStartedAt = Date.now();
-        invoke<string>("get_process_name", { pid: fgPgid }).then(
-          (name) => {
-            pane.foregroundName = name;
-          },
-          () => {
-            pane.foregroundName = null;
-          },
-        );
+      } else if (wasIdle && !newIsIdle) {
+        startForegroundTracking(pane, fgPgid);
       }
-      pane.lastForegroundPid = fgPgid;
+      pane.wasIdle = newIsIdle;
 
       const skipExpensive = newIsIdle && pane.idleConsecutive > 5;
 
