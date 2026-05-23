@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-05-23
+
+### Changed
+- **System notification surface narrowed — agent attention (OSC 9;2) is now the only producer.** Before, a single agent turn could fire two banners (the generic "command finished in: X" matcher fired alongside the agent's own OSC), and server-started / server-crashed / generic error matchers piled up in Notification Center for events users could already see in-tab. The `notifyCommandComplete()` path, the `EVENT_TO_CONFIG_KEY` map, and the entire `notifications.types` config subtree are gone. Server-detection matchers still feed the in-tab "Open localhost:X in Browser" context menu and the per-tab `lastError` display — only the system-banner surface is removed. As part of the same pass, the `muted` flag now gates `Tab.handleOscNotification` once at the top so a muted tab silences the sidebar dot and the banner together (previously each surface was checked separately, and a dead `onNeedsAttention` callback was still wired up post-#547 phase 1 producing duplicate banners). Config schema bumped to v3 with a migration that strips the legacy `notifications.types` subtree (#547).
+- **Pane-scoped active-tab suppression in multi-pane tabs.** Before: a 4-pane tab where you're focused on pane A wouldn't fire a banner for pane B's agent because the tab was "visible." After: the banner fires unless you're actually looking at *that specific pane*. Single-pane tabs are unaffected (focused pane equals only pane) (#549).
+- **Per-tab 4-second cooldown on agent-attention banners.** A misbehaving agent or runaway Claude Code Notification hook can emit OSC 9;2 in a tight loop — without throttling that's 10 banners in a second, replacing each other on platforms with tag-coalescing and burning through Notification Center retention. The sidebar dot still updates every time (idempotent); only the system banner is throttled. Per-tab rather than global so a noisy agent in tab A can't penalize tab B. Cooldown records are dropped on tab close so the map stays bounded across long sessions (#551).
+
+### Removed
+- **Web Audio chime.** The in-app two-tone AudioContext chime bypassed macOS Focus / Do Not Disturb because it was app audio, not OS-notification audio. Banners alone are signal enough; users who want a notification sound can configure one through System Settings → Notifications. Notifications now post with `silent: true` so the OS default chime doesn't sneak back in alongside the live banner. Config schema bumped to v4 with a migration that strips the legacy `notifications.sound` field.
+
+### Fixed
+- **Cmd+Shift+D now actually splits vertically.** The split container in `tab.ts` is built as `split-container split-${direction}`, but #518 deleted the `.split-horizontal` / `.split-vertical` CSS thinking it was dead — the commit conflated the container's class template with the divider's `split-divider-${direction}` template on the next line. Without these rules the container fell back to the default `flex-direction: row`, so a vertical split rendered side-by-side and was visually indistinguishable from a horizontal split. Horizontal splits worked by coincidence. This is the second regression of the same rules — `c11f046` already restored them once after #472 — so a `DO NOT REMOVE` comment now points at the consumer in `tab.ts` so a third cleanup pass doesn't repeat the mistake (#557).
+- **Notification permission denied now surfaces a one-shot toast** explaining how to enable (System Settings → Notifications → Clawterm), instead of silently no-op'ing on every OSC. Latched with a per-session flag so it doesn't spam. On window-focus the OS permission is re-queried so a user who flips permission on externally gets working banners without an app restart; a re-grant resets the latch so the toast fires again on a future revoke. A public `isOperational` getter is exposed for the upcoming settings UI (#553) to render the disabled state (#550).
+
+
 ## [1.6.4] - 2026-05-19
 
 ### Fixed
@@ -1259,7 +1274,8 @@ This release establishes Clawterm's visual identity, transforming the app from a
 - Native macOS text editing shortcuts
 - Tauri 2 + xterm.js architecture
 
-[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.6.4...HEAD
+[Unreleased]: https://github.com/clawterm/clawterm/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/clawterm/clawterm/compare/v1.6.4...v1.7.0
 [1.6.4]: https://github.com/clawterm/clawterm/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/clawterm/clawterm/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/clawterm/clawterm/compare/v1.6.1...v1.6.2

@@ -200,8 +200,7 @@ export class Tab {
       this.state.needsAttention = true;
       this.onStateChange?.();
     }
-    const userIsLookingAtThisPane =
-      this.isVisible && pane === this.focusedPane && !document.hidden;
+    const userIsLookingAtThisPane = this.isVisible && pane === this.focusedPane && !document.hidden;
     if (!userIsLookingAtThisPane) {
       this.onOscNotification?.(text);
     }

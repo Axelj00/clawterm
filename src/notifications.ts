@@ -1,10 +1,6 @@
 import { logger } from "./logger";
 import { showToast } from "./toast";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
 export interface NotificationsConfig {
   enabled: boolean;
