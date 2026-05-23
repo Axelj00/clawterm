@@ -24,6 +24,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Shared brand palette — single source of truth for both this page and
+       the in-app shell. See docs/brand-tokens.css. (#530) -->
+  <link rel="stylesheet" href="brand-tokens.css">
   <!-- Structured data -->
   <script type="application/ld+json">
   {
@@ -45,18 +48,10 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg: #050607;
-      --surface: #0b0d0e;
-      --panel: #111315;
-      --border: #2a2e31;
-      --text: #f4f4f5;
-      --text-secondary: #9ca3af;
-      --text-dim: rgba(244, 244, 245, 0.45);
-      --accent: #7cff4f;
-      --accent-hover: #8fff6a;
-      --accent-on: #050607;
-      --sans: "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
-      --wordmark: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+      /* Brand palette tokens (--bg-base, --bg-surface, --bg-elevated,
+       * --border, --text-primary, --text-secondary, --text-tertiary,
+       * --accent, --accent-hover, --accent-on, --font-mono) come from
+       * brand-tokens.css. Page-local extras only below. */
       --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
@@ -66,10 +61,10 @@
     }
 
     body {
-      font-family: var(--sans);
+      font-family: var(--font-mono);
       font-feature-settings: "cv01", "ss03";
-      background: var(--bg);
-      color: var(--text);
+      background: var(--bg-base);
+      color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -80,7 +75,7 @@
     }
 
     a { color: var(--text-secondary); text-decoration: none; transition: color 0.16s var(--ease); }
-    a:hover { color: var(--text); }
+    a:hover { color: var(--text-primary); }
     a:focus-visible, button:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -94,14 +89,14 @@
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      font-family: var(--wordmark);
+      font-family: var(--font-mono);
       font-size: 16px;
       font-weight: 700;
-      color: var(--text);
+      color: var(--text-primary);
       letter-spacing: 0;
       z-index: 10;
     }
-    .logo:hover { color: var(--text); }
+    .logo:hover { color: var(--text-primary); }
     .logo img {
       width: 26px;
       height: 26px;
@@ -137,7 +132,7 @@
       border-radius: 12px;
       border: 1px solid var(--border);
       overflow: hidden;
-      background: var(--surface);
+      background: var(--bg-surface);
       box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
     }
     .demo-video img {
@@ -157,12 +152,12 @@
     }
 
     .headline {
-      font-family: var(--sans);
+      font-family: var(--font-mono);
       font-size: 22px;
       font-weight: 500;
       line-height: 1.55;
       letter-spacing: 0;
-      color: var(--text);
+      color: var(--text-primary);
       text-wrap: pretty;
     }
 
@@ -172,7 +167,7 @@
       gap: 10px;
       padding: 12px 28px;
       border-radius: 12px;
-      font-family: var(--sans);
+      font-family: var(--font-mono);
       font-size: 14px;
       font-weight: 600;
       letter-spacing: 0;
@@ -195,7 +190,7 @@
 
     .contact {
       font-size: 13px;
-      color: var(--text-dim);
+      color: var(--text-tertiary);
       line-height: 1.7;
       letter-spacing: 0;
     }
@@ -208,13 +203,13 @@
       transition: color 0.16s var(--ease), text-decoration-color 0.16s var(--ease);
     }
     .contact a:hover {
-      color: var(--text);
+      color: var(--text-primary);
       text-decoration-color: var(--text-secondary);
     }
 
     .license {
       font-size: 11px;
-      color: var(--text-dim);
+      color: var(--text-tertiary);
       letter-spacing: 0.02em;
     }
 

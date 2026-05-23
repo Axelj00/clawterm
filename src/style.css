@@ -1,10 +1,12 @@
-:root {
-  /* ── ClawTerm Brand Palette ──────────────────────────────────────────── */
+/* The brand palette lives in docs/brand-tokens.css so the same values can be
+ * consumed by both the in-app shell (this file) and the landing page
+ * (docs/index.html). Edit values there, not here. (#530) */
+@import "../docs/brand-tokens.css";
 
-  /* Surfaces — clear hierarchy: base < surface < elevated. */
-  --bg-base: #050607;
-  --bg-surface: #0b0d0e;
-  --bg-elevated: #111315;
+:root {
+  /* ── In-app extensions to the shared brand palette ──────────────────── */
+
+  /* Surfaces — additional in-app-only variants on top of base/surface/elevated. */
   --bg-modal: rgba(11, 13, 14, 0.97);
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-active: rgba(255, 255, 255, 0.1);
@@ -13,21 +15,11 @@
      to scrollbar appearance don't silently move button hovers (#537). */
   --bg-hover-strong: rgba(255, 255, 255, 0.15);
 
-  /* Text — translucent so it reads correctly over arbitrary surfaces. */
-  --text-primary: rgba(244, 244, 245, 0.9);
-  --text-secondary: rgba(244, 244, 245, 0.55);
-  --text-tertiary: rgba(244, 244, 245, 0.35);
-
-  /* Accent — Command Green. Reserved for active state only. */
-  --accent: #7cff4f;
-  --accent-hover: #8fff6a;
+  /* Accent — in-app-only tints on top of the shared accent. */
   --accent-muted: rgba(124, 255, 79, 0.12);
   --accent-border: rgba(124, 255, 79, 0.35);
-  --accent-on: #050607;
 
-  /* Borders — solid --border for opaque separators; the rgba pair for
-     subtle overlays where tinting matters more than exact color. */
-  --border: #22262a;
+  /* Borders — translucent overlay variants on top of the shared --border. */
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-default: rgba(255, 255, 255, 0.09);
   --border-width: 1px;
@@ -52,11 +44,8 @@
   accent-color: var(--accent);
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  /* One font stack for the whole app — brand is all-mono, no companion
-     sans (docs/brand.md § Type). Inter is retired (#535). */
-  --font-mono:
-    "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco,
-    Consolas, monospace;
+  /* --font-mono lives in docs/brand-tokens.css (#530). The size/weight scale
+     is in-app only. */
   --font-2xs: 8px;
   --font-xs: 10px;
   --font-sm: 11px;

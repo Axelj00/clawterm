@@ -1,0 +1,40 @@
+/* ── ClawTerm brand palette — single source of truth (#530) ────────────────
+ *
+ * Imported by `src/style.css` (in-app shell) and linked by `docs/index.html`
+ * (landing page). Edit values HERE and they propagate to both surfaces — do
+ * not redeclare any of these tokens elsewhere or the two surfaces will drift
+ * again (already drifted before this file was extracted — landing-page
+ * `--border` was `#2a2e31`, in-app was `#22262a`).
+ *
+ * Token names follow the in-app convention enforced by scripts/lint-tokens.sh.
+ * The landing page uses these same names; the older `--bg / --surface / --panel`
+ * names were renamed in #530.
+ *
+ * Scope: only tokens that are *actually shared* between the two surfaces live
+ * here. Layout, spacing, font-size scale, status colors, etc. stay in
+ * src/style.css because the landing page doesn't consume them.
+ */
+:root {
+  /* Surfaces — clear hierarchy: base < surface < elevated. */
+  --bg-base: #050607;
+  --bg-surface: #0b0d0e;
+  --bg-elevated: #111315;
+
+  /* Text — translucent so it reads correctly over arbitrary surfaces. */
+  --text-primary: rgba(244, 244, 245, 0.9);
+  --text-secondary: rgba(244, 244, 245, 0.55);
+  --text-tertiary: rgba(244, 244, 245, 0.35);
+
+  /* Accent — Command Green. Reserved for active state only. */
+  --accent: #7cff4f;
+  --accent-hover: #8fff6a;
+  --accent-on: #050607;
+
+  /* Borders — opaque separator. */
+  --border: #22262a;
+
+  /* Font stack — brand is all-mono, no companion sans (docs/brand.md § Type). */
+  --font-mono:
+    "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, "SF Mono", Menlo, Monaco,
+    Consolas, monospace;
+}

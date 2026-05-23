@@ -43,6 +43,7 @@ jobs:
           mkdir -p deploy
           # Marketing landing assets at the site root
           cp docs/index.html deploy/
+          cp docs/brand-tokens.css deploy/
           cp docs/favicon.png deploy/ 2>/dev/null || true
           cp docs/favicon.svg deploy/ 2>/dev/null || true
           cp docs/sitemap.xml deploy/ 2>/dev/null || true
