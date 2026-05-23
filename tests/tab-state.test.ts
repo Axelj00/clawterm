@@ -4,6 +4,7 @@ import {
   createDefaultPaneState,
   computeFolderTitle,
   formatElapsed,
+  formatResidentSize,
   parseStatusLine,
   deriveClaudeAttention,
   deriveClaudeContextPct,
@@ -304,5 +305,29 @@ describe("formatElapsed", () => {
   it("caps at Nd Hh past 24 hours so width stays bounded", () => {
     expect(formatElapsed(at(24 * 60 * 60 * 1000))).toBe("1d 0h");
     expect(formatElapsed(at(7 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000))).toBe("7d 14h");
+  });
+});
+
+describe("formatResidentSize", () => {
+  it("returns empty string for null / zero so the badge collapses", () => {
+    expect(formatResidentSize(null)).toBe("");
+    expect(formatResidentSize(0)).toBe("");
+    expect(formatResidentSize(-5)).toBe("");
+  });
+
+  it("uses K for sub-megabyte values", () => {
+    expect(formatResidentSize(2048)).toBe("2K");
+    expect(formatResidentSize(512 * 1024)).toBe("512K");
+  });
+
+  it("uses M for megabyte values", () => {
+    expect(formatResidentSize(156 * 1024 * 1024)).toBe("156M");
+    expect(formatResidentSize(1024 * 1024)).toBe("1M");
+  });
+
+  it("uses G with one decimal under 10 GiB, none above", () => {
+    expect(formatResidentSize(1.2 * 1024 * 1024 * 1024)).toBe("1.2G");
+    expect(formatResidentSize(4 * 1024 * 1024 * 1024)).toBe("4.0G");
+    expect(formatResidentSize(12 * 1024 * 1024 * 1024)).toBe("12G");
   });
 });

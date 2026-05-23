@@ -22,6 +22,10 @@ pub struct PanePollResult {
     /// Raw Claude Code statusLine JSON keyed by the foreground PID, if the
     /// statusline.sh writer has produced a file for it. Frontend parses.
     pub claude_status: Option<String>,
+    /// Resident memory size (RSS) in bytes for the foreground PID (or the
+    /// shell PID if nothing else is running). None on syscall failure —
+    /// frontend just hides the badge. (#560)
+    pub resident_size: Option<u64>,
 }
 
 /// Batched pane poll — performs CWD, git, project introspection, and a
@@ -87,12 +91,21 @@ pub async fn poll_pane_info(
         _ => None,
     };
 
+    // 5. Resident memory (#560). Query the foreground PID when one is
+    // active so the badge reflects the actual workload (a Claude session,
+    // a build, a test run) rather than zsh idling; fall back to the shell
+    // when the shell itself is foreground. Single proc_pidinfo call —
+    // kernel-state read, no I/O, well under 1ms.
+    let rss_pid = fg_pid.unwrap_or(shell_pid);
+    let resident_size = platform::proc_resident_size(rss_pid);
+
     Ok(PanePollResult {
         cwd_folder,
         cwd_full,
         git,
         project_name,
         claude_status,
+        resident_size,
     })
 }
 
@@ -272,6 +285,66 @@ mod platform {
             }
 
             Ok(path)
+        }
+    }
+
+    /// Resident memory size (RSS) for a process, in bytes. Returns None
+    /// on any failure (process gone, denied, syscall mismatch). Used by
+    /// the per-pane footer's memory badge (#560). PROC_PIDTASKINFO is
+    /// flavor 4; we read only `pti_resident_size` from the returned struct.
+    pub fn proc_resident_size(pid: u32) -> Option<u64> {
+        const PROC_PIDTASKINFO: libc::c_int = 4;
+
+        // proc_taskinfo is 248 bytes on macOS — pti_resident_size sits at
+        // offset 16 (after virtual_size + total user/system times that
+        // precede it). Define the whole struct here so the compile-time
+        // size assertion catches any future ABI shift.
+        #[repr(C)]
+        struct ProcTaskInfo {
+            pti_virtual_size: u64,
+            pti_resident_size: u64,
+            pti_total_user: u64,
+            pti_total_system: u64,
+            pti_threads_user: u64,
+            pti_threads_system: u64,
+            pti_policy: i32,
+            pti_faults: i32,
+            pti_pageins: i32,
+            pti_cow_faults: i32,
+            pti_messages_sent: i32,
+            pti_messages_received: i32,
+            pti_syscalls_mach: i32,
+            pti_syscalls_unix: i32,
+            pti_csw: i32,
+            pti_threadnum: i32,
+            pti_numrunning: i32,
+            pti_priority: i32,
+        }
+
+        // 6×u64 + 12×i32 = 96 bytes — matches Darwin's struct proc_taskinfo
+        // in <sys/proc_info.h>. PROC_PIDTASKINFO_SIZE is defined the same.
+        const _: () = assert!(
+            mem::size_of::<ProcTaskInfo>() == 96,
+            "ProcTaskInfo size mismatch — macOS struct layout may have changed"
+        );
+
+        if pid == 0 {
+            return None;
+        }
+        unsafe {
+            let mut info: ProcTaskInfo = mem::zeroed();
+            let size = mem::size_of::<ProcTaskInfo>() as libc::c_int;
+            let ret = libc::proc_pidinfo(
+                pid as libc::c_int,
+                PROC_PIDTASKINFO,
+                0,
+                &mut info as *mut _ as *mut libc::c_void,
+                size,
+            );
+            if ret <= 0 {
+                return None;
+            }
+            Some(info.pti_resident_size)
         }
     }
 
@@ -502,6 +575,42 @@ mod tests {
     #[test]
     fn test_pid_alive_huge_pid_is_false() {
         assert!(!platform::pid_alive(u32::MAX - 1));
+    }
+
+    #[test]
+    fn test_proc_resident_size_self_positive() {
+        let rss = platform::proc_resident_size(std::process::id())
+            .expect("self proc_resident_size should succeed");
+        // The test harness binary's RSS must be > 1 MB — sanity check.
+        assert!(rss > 1_048_576, "self RSS unexpectedly low: {} bytes", rss);
+    }
+
+    #[test]
+    fn test_proc_resident_size_invalid_pid_returns_none() {
+        assert!(platform::proc_resident_size(u32::MAX).is_none());
+    }
+
+    #[test]
+    fn test_proc_resident_size_zero_returns_none() {
+        assert!(platform::proc_resident_size(0).is_none());
+    }
+
+    #[test]
+    fn test_poll_pane_info_populates_resident_size() {
+        // Use our own PID as the shell, with no fg PID — RSS should come
+        // back from the shell PID and be > 0.
+        let self_pid = std::process::id();
+        let result = tauri::async_runtime::block_on(poll_pane_info(
+            self_pid,
+            None,
+            Some("/tmp".to_string()),
+            true,
+        ));
+        let r = result.unwrap();
+        assert!(
+            r.resident_size.is_some_and(|v| v > 0),
+            "resident_size should be populated for live PID"
+        );
     }
 
     #[test]

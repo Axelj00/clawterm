@@ -12,7 +12,13 @@ import { ScrollAnchor } from "./scroll-anchor";
 import type { OutputEvent, OutputMatcher } from "./matchers";
 import { DEFAULT_MATCHERS } from "./matchers";
 import { registerOscHandlers, type OscNotificationEvent } from "./osc-handler";
-import { type PaneState, type StatusLineData, createDefaultPaneState, formatElapsed } from "./tab-state";
+import {
+  type PaneState,
+  type StatusLineData,
+  createDefaultPaneState,
+  formatElapsed,
+  formatResidentSize,
+} from "./tab-state";
 import { SearchBar } from "./search-bar";
 import { logger } from "./logger";
 import { showToast } from "./toast";
@@ -734,7 +740,11 @@ export class Pane {
     const slKey = sl
       ? `${sl.model.displayName}|${ctx?.usedPercentage ?? ""}|${sl.exceeds200kTokens ?? ""}|${sl.effort?.level ?? ""}|${sl.vim?.mode ?? ""}`
       : "no-sl";
-    const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${slKey}`;
+    // Quantize RSS to its display string so the row only repaints when
+    // the bucket actually changes — avoids per-poll churn for sub-megabyte
+    // jitter. (#560)
+    const rssDisplay = formatResidentSize(s.residentSize);
+    const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${slKey}|${rssDisplay}`;
     const elapsed = formatElapsed(this.createdAt);
 
     if (structuralKey === this.footerStructuralKey) {
@@ -753,6 +763,11 @@ export class Pane {
       if (gs && gs.ahead > 0) {
         pushSpan(this.footerRow, "footer-branch-ahead", `\u2191${gs.ahead}`, `${gs.ahead} ahead of remote`);
       }
+    }
+    // Memory badge \u2014 hidden when value is null/zero, sits between the
+    // branch and elapsed counter. (#560)
+    if (rssDisplay) {
+      pushSpan(this.footerRow, "footer-mem", rssDisplay, "Foreground process resident memory");
     }
     this.footerElapsedSpan = pushSpan(this.footerRow, "footer-elapsed", elapsed);
   }

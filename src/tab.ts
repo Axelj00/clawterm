@@ -28,6 +28,8 @@ interface PanePollResult {
   git: GitStatusInfo | null;
   project_name: string | null;
   claude_status: string | null;
+  /** Foreground process RSS in bytes (#560). Null on syscall failure. */
+  resident_size: number | null;
 }
 
 export type SplitDirection = "horizontal" | "vertical";
@@ -810,6 +812,8 @@ export class Tab {
         pane.lastClaudeStatusJson = result.claude_status;
         ps.statusLine = result.claude_status ? parseStatusLine(result.claude_status) : null;
       }
+
+      ps.residentSize = result.resident_size;
 
       const fullCwd = result.cwd_full || null;
       ps.folderName = result.cwd_folder || ps.folderName;

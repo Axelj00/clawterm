@@ -1430,11 +1430,18 @@ body {
    and the elapsed counter / badges stay visible even on narrow panes. */
 .footer-elapsed,
 .footer-branch-ahead,
+.footer-mem,
 .footer-claude-context,
 .footer-claude-effort,
 .footer-claude-tag,
 .footer-claude-vim {
   flex-shrink: 0;
+}
+
+/* Foreground process RSS — sits between branch and elapsed counter. (#560) */
+.footer-mem {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
 }
 
 .footer-branch-ahead {

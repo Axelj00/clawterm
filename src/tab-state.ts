@@ -251,6 +251,9 @@ export interface PaneState {
   gitStatus: GitStatusInfo | null;
   /** Claude Code statusLine data — context usage, cost, model (#348) */
   statusLine: StatusLineData | null;
+  /** Foreground process RSS in bytes — null when the syscall fails or
+   *  hasn't reported yet. Surfaced as the per-pane memory badge. (#560) */
+  residentSize: number | null;
 }
 
 export function createDefaultPaneState(): PaneState {
@@ -262,7 +265,26 @@ export function createDefaultPaneState(): PaneState {
     gitBranch: null,
     gitStatus: null,
     statusLine: null,
+    residentSize: null,
   };
+}
+
+/** Format a byte count as a short human-readable badge string ("156M",
+ *  "1.2G", "42K"). Mirrors htop's display style — base-1024 units to
+ *  match the macOS Memory column convention. Returns "" for null/zero
+ *  so the badge collapses cleanly. (#560) */
+export function formatResidentSize(bytes: number | null): string {
+  if (bytes == null || bytes <= 0) return "";
+  const KB = 1024;
+  const MB = KB * 1024;
+  const GB = MB * 1024;
+  if (bytes >= GB) {
+    const v = bytes / GB;
+    return `${v >= 10 ? v.toFixed(0) : v.toFixed(1)}G`;
+  }
+  if (bytes >= MB) return `${Math.round(bytes / MB)}M`;
+  if (bytes >= KB) return `${Math.round(bytes / KB)}K`;
+  return `${bytes}B`;
 }
 
 /** Notification type for background tab badges */
