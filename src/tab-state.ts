@@ -9,6 +9,11 @@ export interface GitStatusInfo {
   ahead: number;
   behind: number;
   is_worktree: boolean;
+  /** Lines added in the working tree (incl. new untracked files), used
+   *  by the +N -M badge in the footer. 0 when nothing is pending. (#559) */
+  lines_added: number;
+  /** Lines removed in the working tree vs HEAD. */
+  lines_removed: number;
 }
 
 /**

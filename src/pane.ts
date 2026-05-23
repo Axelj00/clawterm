@@ -744,7 +744,7 @@ export class Pane {
     // the bucket actually changes — avoids per-poll churn for sub-megabyte
     // jitter. (#560)
     const rssDisplay = formatResidentSize(s.residentSize);
-    const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${slKey}|${rssDisplay}`;
+    const structuralKey = `${s.folderName}|${s.gitBranch}|${gs?.modified ?? ""}|${gs?.staged ?? ""}|${gs?.untracked ?? ""}|${gs?.ahead ?? ""}|${gs?.behind ?? ""}|${gs?.lines_added ?? ""}|${gs?.lines_removed ?? ""}|${slKey}|${rssDisplay}`;
     const elapsed = formatElapsed(this.createdAt);
 
     if (structuralKey === this.footerStructuralKey) {
@@ -762,6 +762,16 @@ export class Pane {
       pushSpan(this.footerRow, "footer-branch", s.gitBranch);
       if (gs && gs.ahead > 0) {
         pushSpan(this.footerRow, "footer-branch-ahead", `\u2191${gs.ahead}`, `${gs.ahead} ahead of remote`);
+      }
+    }
+    // Lines-changed badge \u2014 hidden when working tree matches HEAD. (#559)
+    if (gs && (gs.lines_added > 0 || gs.lines_removed > 0)) {
+      const tooltip = `${gs.lines_added} added, ${gs.lines_removed} removed`;
+      if (gs.lines_added > 0) {
+        pushSpan(this.footerRow, "footer-diff-added", `+${gs.lines_added}`, tooltip);
+      }
+      if (gs.lines_removed > 0) {
+        pushSpan(this.footerRow, "footer-diff-removed", `-${gs.lines_removed}`, tooltip);
       }
     }
     // Memory badge \u2014 hidden when value is null/zero, sits between the

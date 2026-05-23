@@ -1431,6 +1431,8 @@ body {
 .footer-elapsed,
 .footer-branch-ahead,
 .footer-mem,
+.footer-diff-added,
+.footer-diff-removed,
 .footer-claude-context,
 .footer-claude-effort,
 .footer-claude-tag,
@@ -1442,6 +1444,16 @@ body {
 .footer-mem {
   font-variant-numeric: tabular-nums;
   color: var(--text-tertiary);
+}
+
+/* Lines-changed badge — green +N, red -M. Matches git CLI semantics. (#559) */
+.footer-diff-added {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.footer-diff-removed {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-red);
 }
 
 .footer-branch-ahead {
